@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect } from 'react'
 import { v4 as uuidv4 } from 'uuid'
 import { auth } from './firebase'
 import { onAuthStateChanged, signOut } from 'firebase/auth'
-import { appointmentsAPI, doctorsAPI } from './services/api'
+import { appointmentsAPI, doctorsAPI, chatAPI, voiceAPI } from './services/api'
 
 import LeftSidebar     from './components/LeftSidebar'
 import HomeView        from './components/views/HomeView'
@@ -23,6 +23,7 @@ function getSessionId() {
 
 // ── Main App ──────────────────────────────────────────────
 export default function App() {
+  const audioRef = useRef(null)
   const [user, setUser]                 = useState(null)
   const [authLoading, setAuthLoading]   = useState(true)
   const [sessionId]                     = useState(getSessionId)
@@ -127,6 +128,41 @@ export default function App() {
     if (lang) setLanguage(lang)
   }, [addMessage])
 
+  const playAudio = useCallback(async (text, lang) => {
+    try {
+      setStatus('speaking')
+      const res  = await voiceAPI.tts(text, lang)
+      const url  = URL.createObjectURL(res.data)
+      const audio = new Audio(url)
+      audioRef.current = audio
+      audio.onended = () => {
+        URL.revokeObjectURL(url)
+        setStatus('ready')
+      }
+      audio.onerror = () => setStatus('ready')
+      audio.play()
+    } catch {
+      setStatus('ready')
+    }
+  }, [])
+
+  const sendChatMessage = useCallback(async (userText) => {
+    if (!userText.trim()) return
+    handleUserMessage(userText, language)
+    setStatus('thinking')
+    try {
+      const res = await chatAPI.send(userText, sessionId, patientName, language)
+      const { response, language: detectedLang } = res.data
+      if (detectedLang && detectedLang !== language) setLanguage(detectedLang)
+      handleAIResponse(response, detectedLang || language)
+      await playAudio(response, detectedLang || language)
+    } catch (err) {
+      const errMsg = err.response?.data?.detail || 'Something went wrong. Please try again.'
+      handleAIResponse(errMsg, language)
+      setStatus('ready')
+    }
+  }, [sessionId, patientName, language, handleUserMessage, handleAIResponse, playAudio])
+
   // Initial greeting trigger after login
   useEffect(() => {
     if (user && messages.length === 0) {
@@ -166,12 +202,18 @@ export default function App() {
             setStatus={setStatus}
             activities={activities}
             dashboardData={dashboardData}
+            sendChatMessage={sendChatMessage}
           />
         );
       case 'Appointments':
         return <AppointmentsView />;
       case 'Doctors':
-        return <DoctorsView />;
+        return <DoctorsView 
+          onBook={(docName) => {
+            setActiveTab('Home');
+            setTimeout(() => sendChatMessage(`I want to book an appointment with ${docName}`), 100);
+          }} 
+        />;
       case 'Reminders':
         return <RemindersView />;
       case 'History':
@@ -181,7 +223,7 @@ export default function App() {
       case 'Settings':
         return <SettingsView />;
       default:
-        return <HomeView patientName={patientName} messages={messages} status={status} language={language} setLanguage={setLanguage} sessionId={sessionId} handleUserMessage={handleUserMessage} handleAIResponse={handleAIResponse} setStatus={setStatus} activities={activities} dashboardData={dashboardData} />;
+        return <HomeView patientName={patientName} messages={messages} status={status} language={language} setLanguage={setLanguage} sessionId={sessionId} handleUserMessage={handleUserMessage} handleAIResponse={handleAIResponse} setStatus={setStatus} activities={activities} dashboardData={dashboardData} sendChatMessage={sendChatMessage} />;
     }
   }
 

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { doctorsAPI } from '../../services/api';
 
-export default function DoctorsView() {
+export default function DoctorsView({ onBook }) {
   const [doctors, setDoctors] = useState([]);
 
   useEffect(() => {
@@ -74,7 +74,7 @@ export default function DoctorsView() {
               background: doc.status === 'On Leave' ? '#f1f5f9' : '#3b82f6', 
               color: doc.status === 'On Leave' ? '#94a3b8' : 'white', 
               fontWeight:600, cursor: doc.status === 'On Leave' ? 'not-allowed' : 'pointer'
-            }}>
+            }} onClick={() => doc.status !== 'On Leave' && onBook && onBook(doc.name)}>
               {doc.status === 'On Leave' ? 'Unavailable' : 'Book Next Slot'}
             </button>
           </div>

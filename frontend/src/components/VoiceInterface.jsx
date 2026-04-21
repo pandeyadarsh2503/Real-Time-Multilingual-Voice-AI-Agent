@@ -1,13 +1,10 @@
-import { useRef, useState, useCallback, useEffect } from 'react'
+import { useState, useCallback } from 'react'
 import { useWebRTC } from '../hooks/useWebRTC'
-import { voiceAPI, chatAPI } from '../services/api'
+import { voiceAPI } from '../services/api'
 
 export default function VoiceInterface({
-  onMessage,
-  onResponse,
+  sendChatMessage,
   onStatusChange,
-  sessionId,
-  patientName,
   language,
   setLanguage,
   disabled,
@@ -15,46 +12,8 @@ export default function VoiceInterface({
 }) {
   const [textValue, setTextValue] = useState('')
   const { isRecording, startRecording, stopRecording } = useWebRTC()
-  const audioRef = useRef(null)
 
-  const playAudio = useCallback(async (text, lang) => {
-    try {
-      onStatusChange('speaking')
-      const res  = await voiceAPI.tts(text, lang)
-      const url  = URL.createObjectURL(res.data)
-      const audio = new Audio(url)
-      audioRef.current = audio
-      audio.onended = () => {
-        URL.revokeObjectURL(url)
-        onStatusChange('ready')
-      }
-      audio.onerror = () => onStatusChange('ready')
-      audio.play()
-    } catch {
-      onStatusChange('ready')
-    }
-  }, [onStatusChange])
 
-  const handleSubmit = useCallback(async (userText, lang) => {
-    if (!userText.trim()) return
-
-    onMessage(userText, lang)
-    onStatusChange('thinking')
-
-    try {
-      const res = await chatAPI.send(userText, sessionId, patientName, lang)
-      const { response, language: detectedLang } = res.data
-
-      if (detectedLang && detectedLang !== lang) setLanguage(detectedLang)
-
-      onResponse(response, detectedLang || lang)
-      await playAudio(response, detectedLang || lang)
-    } catch (err) {
-      const errMsg = err.response?.data?.detail || 'Something went wrong. Please try again.'
-      onResponse(errMsg, lang)
-      onStatusChange('ready')
-    }
-  }, [sessionId, patientName, onMessage, onResponse, onStatusChange, setLanguage, playAudio])
 
   const handleMic = useCallback(async () => {
     if (disabled) return
@@ -74,19 +33,19 @@ export default function VoiceInterface({
         if (!text.trim()) { onStatusChange('ready'); return }
         if (detectedLang) setLanguage(detectedLang)
 
-        await handleSubmit(text, detectedLang || language)
+        await sendChatMessage(text)
       } catch {
         onStatusChange('ready')
       }
     }
-  }, [disabled, isRecording, startRecording, stopRecording, language, setLanguage, handleSubmit, onStatusChange])
+  }, [disabled, isRecording, startRecording, stopRecording, language, setLanguage, sendChatMessage, onStatusChange])
 
   const handleTextSend = useCallback(async () => {
     const text = textValue.trim()
     if (!text || disabled) return
     setTextValue('')
-    await handleSubmit(text, language)
-  }, [textValue, disabled, language, handleSubmit])
+    await sendChatMessage(text)
+  }, [textValue, disabled, sendChatMessage])
 
   const onKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleTextSend() }

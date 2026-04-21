@@ -41,7 +41,8 @@ export default function HomeView({
   handleAIResponse, 
   setStatus,
   activities,
-  dashboardData
+  dashboardData,
+  sendChatMessage
 }) {
   const isDisabled = status === 'thinking' || status === 'speaking';
 
@@ -60,15 +61,12 @@ export default function HomeView({
           
           <div style={{ padding: '0 20px 20px 20px' }}>
             <VoiceInterface
-              sessionId={sessionId}
-              patientName={patientName}
               language={language}
               setLanguage={setLanguage}
-              onMessage={handleUserMessage}
-              onResponse={handleAIResponse}
               onStatusChange={setStatus}
               disabled={isDisabled}
               status={status}
+              sendChatMessage={sendChatMessage}
             />
           </div>
         </div>
@@ -124,7 +122,7 @@ export default function HomeView({
                 <button 
                   key={action.id}
                   className="action-box-new" 
-                  onClick={() => handleUserMessage(action.prompt, language)} 
+                  onClick={() => sendChatMessage(action.prompt)} 
                   style={{ background: action.bgColor, border: 'none', borderRadius: '12px', padding: '10px', display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'flex-start', cursor: 'pointer', textAlign: 'left', minWidth: 0 }}
                 >
                   <span style={{ color: action.iconColor, fontSize: '20px' }}>{action.icon}</span>
@@ -144,7 +142,7 @@ export default function HomeView({
             <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
               {dashboardData.recentDoctors.map((doc, index) => (
                 <React.Fragment key={doc.id}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }} onClick={() => handleUserMessage(`I want to see ${doc.name}`, language)}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }} onClick={() => sendChatMessage(`I want to book an appointment with ${doc.name}`)}>
                      <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
                        <img src={doc.imgUrl} style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover', background: '#e2e8f0' }} alt={doc.name} />
                        <div>

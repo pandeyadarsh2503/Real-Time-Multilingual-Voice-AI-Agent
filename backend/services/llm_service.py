@@ -6,13 +6,16 @@ import json
 import logging
 from datetime import datetime, date
 from groq import Groq
-from config import settings, GROQ_MODEL, DOCTOR_NAMES
+from config import settings, GROQ_MODEL, DOCTOR_NAMES, DOCTORS
 
 logger = logging.getLogger(__name__)
 client = Groq(api_key=settings.GROQ_API_KEY)
 
+DOCTORS_TEXT = "\n".join([f"  {i+1}. {d['name']} — {d['specialty']} | {d.get('availability', '')} | {', '.join(d.get('languages', []))}" for i, d in enumerate(DOCTORS)])
+DOCTORS_EXAMPLE = ", ".join([f"'{d}'" for d in DOCTOR_NAMES[:3]]) + " etc."
+
 # ── System Prompt ──────────────────────────────────────────
-SYSTEM_PROMPT = """\
+SYSTEM_PROMPT = f"""\
 You are ClinicAI — a real-time multilingual AI voice assistant for a healthcare clinic.
 You communicate naturally in English, Hindi, and Tamil.
 
@@ -24,9 +27,7 @@ You communicate naturally in English, Hindi, and Tamil.
 
 ━━ CLINIC ━━
 Doctors:
-  1. Dr Sharma  — Cardiologist
-  2. Dr Iyer    — General Physician
-  3. Dr Mehta   — Dermatologist
+{{doctors_list}}
 Working hours : 09:00 AM – 05:00 PM (slots every 30 min)
 No double booking. No past-date/time booking allowed.
 Today's date : {today}
@@ -77,7 +78,7 @@ TOOLS = [
                 "properties": {
                     "doctor": {
                         "type": "string",
-                        "description": "Exact doctor name: 'Dr Sharma', 'Dr Iyer', or 'Dr Mehta'",
+                        "description": f"Exact doctor name: {DOCTORS_EXAMPLE}",
                     },
                     "date": {
                         "type": "string",
@@ -156,6 +157,7 @@ async def run_agent(messages: list, tool_executor, max_iter: int = 6) -> tuple[s
             "content": SYSTEM_PROMPT.format(
                 today=date.today().isoformat(),
                 now=datetime.now().strftime("%H:%M"),
+                doctors_list=DOCTORS_TEXT,
             ),
         }
 
