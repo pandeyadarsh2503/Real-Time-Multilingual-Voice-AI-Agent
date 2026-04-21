@@ -31,6 +31,34 @@ export default function App() {
   
   // Dashboard routing state
   const [activeTab, setActiveTab]       = useState('Home')
+  const [activities, setActivities]     = useState([
+    { id: 1, icon: '🚀', title: 'System Online', desc: 'Command Center active', time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) }
+  ])
+  const [dashboardData, setDashboardData] = useState({
+    upcomingAppointment: {
+      doctorName: 'Dr. Iyer',
+      specialty: 'General Physician',
+      status: 'Confirmed',
+      date: '23 Apr 2025 (Tomorrow)',
+      time: '10:00 AM',
+      location: 'CityCare Clinic, Room 2',
+      id: 'apt_1'
+    },
+    recentDoctors: [
+      { id: 'dr_iyer', name: 'Dr. Iyer', specialty: 'General Physician', icon: '👨‍⚕️', imgUrl: 'https://i.pravatar.cc/150?u=driyer5' },
+      { id: 'dr_mehta', name: 'Dr. Mehta', specialty: 'Dermatologist', icon: '👩‍⚕️', imgUrl: 'https://i.pravatar.cc/150?u=drmehta7' }
+    ],
+    quickActions: [
+      { id: 'book', icon: '📅', title: 'Book Appointment', bgColor: '#f0f9ff', iconColor: '#3b82f6', prompt: 'Book an appointment' },
+      { id: 'check', icon: '🗓️', title: 'Check Availability', bgColor: '#f0fdf4', iconColor: '#10b981', prompt: 'Check availability' },
+      { id: 'reschedule', icon: '🔄', title: 'Reschedule Appointment', bgColor: '#fff7ed', iconColor: '#f59e0b', prompt: 'Reschedule my appointment' },
+      { id: 'cancel', icon: '❌', title: 'Cancel Appointment', bgColor: '#fef2f2', iconColor: '#ef4444', prompt: 'Cancel appointment' }
+    ]
+  })
+
+  const addActivity = useCallback((icon, title, desc) => {
+    setActivities(prev => [{ id: uuidv4(), icon, title, desc, time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) }, ...prev])
+  }, [])
 
   // Firebase Auth Listener
   useEffect(() => {
@@ -54,7 +82,10 @@ export default function App() {
 
   const handleUserMessage = useCallback((text, lang) => {
     addMessage('user', text, lang)
-  }, [addMessage])
+    if (text.toLowerCase().includes('book')) addActivity('📅', 'Booking Attempt', text)
+    else if (text.toLowerCase().includes('cancel')) addActivity('❌', 'Cancellation', text)
+    else addActivity('💬', 'Chat Message', text.length > 25 ? text.substring(0,25)+'...' : text)
+  }, [addMessage, addActivity])
 
   const handleAIResponse = useCallback((text, lang) => {
     addMessage('assistant', text, lang)
@@ -98,6 +129,8 @@ export default function App() {
             handleUserMessage={handleUserMessage}
             handleAIResponse={handleAIResponse}
             setStatus={setStatus}
+            activities={activities}
+            dashboardData={dashboardData}
           />
         );
       case 'Appointments':
@@ -113,7 +146,7 @@ export default function App() {
       case 'Settings':
         return <SettingsView />;
       default:
-        return <HomeView patientName={patientName} messages={messages} status={status} language={language} setLanguage={setLanguage} sessionId={sessionId} handleUserMessage={handleUserMessage} handleAIResponse={handleAIResponse} setStatus={setStatus} />;
+        return <HomeView patientName={patientName} messages={messages} status={status} language={language} setLanguage={setLanguage} sessionId={sessionId} handleUserMessage={handleUserMessage} handleAIResponse={handleAIResponse} setStatus={setStatus} activities={activities} dashboardData={dashboardData} />;
     }
   }
 

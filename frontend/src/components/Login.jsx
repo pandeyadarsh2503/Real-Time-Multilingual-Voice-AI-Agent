@@ -9,6 +9,7 @@ import {
 export default function Login() {
   const [isRegister, setIsRegister] = useState(false)
   const [name, setName]             = useState('')
+  const [phone, setPhone]           = useState('')
   const [email, setEmail]           = useState('')
   const [password, setPassword]     = useState('')
   const [error, setError]           = useState('')
@@ -22,8 +23,11 @@ export default function Login() {
     try {
       if (isRegister) {
         if (!name.trim()) throw new Error("Please enter your name.")
+        if (!phone.trim()) throw new Error("Please enter your phone number for campaign features.")
         const userCred = await createUserWithEmailAndPassword(auth, email, password)
         await updateProfile(userCred.user, { displayName: name })
+        // Store phone number locally for demo simulation (or push to backend DB)
+        localStorage.setItem(`phone_${userCred.user.uid}`, phone)
       } else {
         await signInWithEmailAndPassword(auth, email, password)
       }
@@ -54,16 +58,28 @@ export default function Login() {
         )}
 
         {isRegister && (
-          <div>
-            <label style={{ display: 'block', marginBottom: '4px', fontSize: '13px', fontWeight: '600' }}>Full Name</label>
-            <input 
-              type="text" 
-              className="input-field" 
-              style={{ width: '100%', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 14px' }}
-              value={name} onChange={e => setName(e.target.value)}
-              placeholder="John Doe"
-            />
-          </div>
+          <>
+            <div>
+              <label style={{ display: 'block', marginBottom: '4px', fontSize: '13px', fontWeight: '600' }}>Full Name</label>
+              <input 
+                type="text" 
+                className="input-field" 
+                style={{ width: '100%', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 14px' }}
+                value={name} onChange={e => setName(e.target.value)}
+                placeholder="John Doe"
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', marginBottom: '4px', fontSize: '13px', fontWeight: '600' }}>Phone Number <span style={{color:'#6b7280', fontWeight: 'normal'}}>(For Reminders)</span></label>
+              <input 
+                type="tel" 
+                className="input-field" 
+                style={{ width: '100%', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 14px' }}
+                value={phone} onChange={e => setPhone(e.target.value)}
+                placeholder="+91 98765 43210"
+              />
+            </div>
+          </>
         )}
 
         <div>
