@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, BackgroundTasks
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from datetime import date, timedelta
 from typing import Optional
 import logging
+import asyncio
 
 from database.database import get_db
 from database.models import Appointment, OutboundCampaign
@@ -209,3 +210,65 @@ async def handle_patient_response(
             "action":  "acknowledged",
             "message": "Understood. Thank you for your time. Have a great day!",
         }
+
+
+# ── Demo Trigger: delayed call without appointment ID ────────
+class TriggerDemoRequest(BaseModel):
+    phone: str
+    patient_name: str
+    doctor: str
+    date: str
+    time: str
+    delay_minutes: int = 1   # how many minutes to wait before calling
+    language: str = "English"
+
+
+async def _delayed_call(
+    phone: str,
+    patient_name: str,
+    doctor: str,
+    appt_date: str,
+    appt_time: str,
+    delay_minutes: int,
+    language: str,
+):
+    """Wait `delay_minutes` then fire the Exotel call."""
+    await asyncio.sleep(delay_minutes * 60)
+    logger.info(f"Demo trigger: calling {phone} for {patient_name} after {delay_minutes}m")
+    initiate_reminder_call(
+        phone=phone,
+        patient_name=patient_name,
+        doctor=doctor,
+        appt_date=appt_date,
+        appt_time=appt_time,
+    )
+
+
+@router.post("/outbound/trigger-demo")
+async def trigger_demo_call(req: TriggerDemoRequest, background_tasks: BackgroundTasks):
+    """
+    Schedule a live Exotel reminder call for demo purposes.
+    The call fires after `delay_minutes` without needing a DB appointment.
+    The AI will ask if the patient is available with the specified doctor.
+    """
+    if not req.phone:
+        raise HTTPException(status_code=400, detail="Phone number is required")
+
+    background_tasks.add_task(
+        _delayed_call,
+        phone=req.phone,
+        patient_name=req.patient_name,
+        doctor=req.doctor,
+        appt_date=req.date,
+        appt_time=req.time,
+        delay_minutes=req.delay_minutes,
+        language=req.language,
+    )
+
+    return {
+        "success": True,
+        "message": f"✅ Reminder call scheduled! You will receive a call at {req.phone} in {req.delay_minutes} minute(s).",
+        "delay_minutes": req.delay_minutes,
+        "phone": req.phone,
+        "doctor": req.doctor,
+    }

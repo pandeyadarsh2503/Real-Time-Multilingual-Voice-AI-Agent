@@ -22,13 +22,18 @@ export default function Login() {
 
     try {
       if (isRegister) {
-        if (!name.trim()) throw new Error("Please enter your name.")
-        if (!phone.trim()) throw new Error("Please enter your phone number for campaign features.")
+        if (!name.trim()) throw new Error("Please enter your name.");
+        if (!phone.trim()) throw new Error("Phone number is required for outbound call features.");
+        if (!email.trim()) throw new Error("Email address is required.");
+        if (!password.trim()) throw new Error("Password is required.");
+        
         const userCred = await createUserWithEmailAndPassword(auth, email, password)
         await updateProfile(userCred.user, { displayName: name })
         // Store phone number locally for demo simulation (or push to backend DB)
         localStorage.setItem(`phone_${userCred.user.uid}`, phone)
       } else {
+        if (!email.trim()) throw new Error("Email is required.");
+        if (!password.trim()) throw new Error("Password is required.");
         await signInWithEmailAndPassword(auth, email, password)
       }
     } catch (err) {
@@ -60,20 +65,22 @@ export default function Login() {
         {isRegister && (
           <>
             <div>
-              <label style={{ display: 'block', marginBottom: '4px', fontSize: '13px', fontWeight: '600' }}>Full Name</label>
+              <label style={{ display: 'block', marginBottom: '4px', fontSize: '13px', fontWeight: '600' }}>Full Name *</label>
               <input 
                 type="text" 
                 className="input-field" 
+                required
                 style={{ width: '100%', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 14px' }}
                 value={name} onChange={e => setName(e.target.value)}
                 placeholder="John Doe"
               />
             </div>
             <div>
-              <label style={{ display: 'block', marginBottom: '4px', fontSize: '13px', fontWeight: '600' }}>Phone Number <span style={{color:'#6b7280', fontWeight: 'normal'}}>(For Reminders)</span></label>
+              <label style={{ display: 'block', marginBottom: '4px', fontSize: '13px', fontWeight: '600' }}>Phone Number * <span style={{color:'#6b7280', fontWeight: 'normal'}}>(Required for Reminders)</span></label>
               <input 
                 type="tel" 
                 className="input-field" 
+                required
                 style={{ width: '100%', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 14px' }}
                 value={phone} onChange={e => setPhone(e.target.value)}
                 placeholder="+91 98765 43210"
@@ -83,10 +90,11 @@ export default function Login() {
         )}
 
         <div>
-          <label style={{ display: 'block', marginBottom: '4px', fontSize: '13px', fontWeight: '600' }}>Email Address</label>
+          <label style={{ display: 'block', marginBottom: '4px', fontSize: '13px', fontWeight: '600' }}>Email Address *</label>
           <input 
             type="email" 
             className="input-field" 
+            required
             style={{ width: '100%', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 14px' }}
             value={email} onChange={e => setEmail(e.target.value)}
             placeholder="you@example.com"
@@ -94,10 +102,11 @@ export default function Login() {
         </div>
 
         <div>
-          <label style={{ display: 'block', marginBottom: '4px', fontSize: '13px', fontWeight: '600' }}>Password</label>
+          <label style={{ display: 'block', marginBottom: '4px', fontSize: '13px', fontWeight: '600' }}>Password *</label>
           <input 
             type="password" 
             className="input-field" 
+            required
             style={{ width: '100%', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 14px' }}
             value={password} onChange={e => setPassword(e.target.value)}
             placeholder="••••••••"

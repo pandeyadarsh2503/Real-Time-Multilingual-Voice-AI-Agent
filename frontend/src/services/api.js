@@ -52,4 +52,6 @@ export const outboundAPI = {
   simulate:         (appointmentId) =>
     api.post('/outbound/simulate', { appointment_id: appointmentId }),
   upcomingReminders: () => api.get('/outbound/upcoming-reminders'),
+  triggerDemo: ({ phone, patient_name, doctor, date, time, delay_minutes, language }) =>
+    api.post('/outbound/trigger-demo', { phone, patient_name, doctor, date, time, delay_minutes, language }),
 }

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { appointmentsAPI, outboundAPI, doctorsAPI } from '../../services/api';
 
-function ReminderToast({ visible }) {
+function ReminderToast({ visible, message }) {
   if (!visible) return null;
   return (
     <div style={{
@@ -20,17 +20,18 @@ function ReminderToast({ visible }) {
       fontSize: '14px',
       fontWeight: '600',
       animation: 'slideInRight 0.4s ease',
+      maxWidth: '360px',
     }}>
       <div style={{ fontSize: '20px' }}>✅</div>
       <div>
-        <div style={{ fontWeight: '700', fontSize: '15px' }}>Reminder Set!</div>
-        <div style={{ opacity: 0.9, fontSize: '13px', fontWeight: '400' }}>AI will remind you</div>
+        <div style={{ fontWeight: '700', fontSize: '15px' }}>Call Scheduled!</div>
+        <div style={{ opacity: 0.9, fontSize: '12px', fontWeight: '400', marginTop: '2px' }}>{message}</div>
       </div>
     </div>
   );
 }
 
-export default function AppointmentsView({ patientName }) {
+export default function AppointmentsView({ patientName, onNewBooking, userPhone }) {
   const [selectedAppt, setSelectedAppt] = useState(null);
   const [appointments, setAppointments] = useState([]);
   const [reminders, setReminders] = useState([]);
@@ -40,18 +41,48 @@ export default function AppointmentsView({ patientName }) {
   const [reminderDoctor, setReminderDoctor] = useState('');
   const [reminderDate, setReminderDate] = useState('');
   const [reminderTime, setReminderTime] = useState('');
+  const [reminderDelay, setReminderDelay] = useState('1');
   const [showToast, setShowToast] = useState(false);
+  const [toastMsg, setToastMsg] = useState('');
+  const [reminderLoading, setReminderLoading] = useState(false);
+  const [reminderError, setReminderError] = useState('');
+  const [phoneOverride, setPhoneOverride] = useState('');
   const [showDocDropdown, setShowDocDropdown] = useState(false);
   const [docSearch, setDocSearch] = useState('');
 
-  const handleSetReminder = () => {
+  const handleSetReminder = async () => {
     if (!reminderDoctor || !reminderDate || !reminderTime) return;
-    setShowToast(true);
-    setTimeout(() => setShowToast(false), 4000);
-    setReminderDoctor('');
-    setDocSearch('');
-    setReminderDate('');
-    setReminderTime('');
+    const phone = userPhone || phoneOverride;
+    if (!phone) {
+      setReminderError('Please enter your phone number to receive the call.');
+      return;
+    }
+    setReminderLoading(true);
+    setReminderError('');
+    try {
+      const res = await outboundAPI.triggerDemo({
+        phone,
+        patient_name: patientName,
+        doctor: reminderDoctor,
+        date: reminderDate,
+        time: reminderTime,
+        delay_minutes: parseInt(reminderDelay) || 1,
+        language: 'English',
+      });
+      setToastMsg(res.data.message || `Call scheduled in ${reminderDelay} min!`);
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 5000);
+      setReminderDoctor('');
+      setDocSearch('');
+      setReminderDate('');
+      setReminderTime('');
+      setReminderDelay('1');
+      setPhoneOverride('');
+    } catch (err) {
+      setReminderError(err?.response?.data?.detail || 'Failed to schedule call. Check Exotel config.');
+    } finally {
+      setReminderLoading(false);
+    }
   };
 
   // Calendar logic
@@ -101,14 +132,14 @@ export default function AppointmentsView({ patientName }) {
 
   return (
     <div className="view-container fade-in">
-      <ReminderToast visible={showToast} />
+      <ReminderToast visible={showToast} message={toastMsg} />
       <header className="top-header" style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: '20px' }}>
         <div className="header-titles">
           <h1>Calendar & Reminders</h1>
           <p>Manage your schedules, conflicts and automated voice calls</p>
         </div>
         <div className="header-actions" style={{display:'flex', gap:'10px'}}>
-          <button className="primary-btn" style={{background:'#3b82f6', color:'white', padding:'8px 16px', borderRadius:'8px', border:'none'}}>+ New Booking</button>
+          <button className="primary-btn" onClick={onNewBooking} style={{background:'#3b82f6', color:'white', padding:'8px 16px', borderRadius:'8px', border:'none', cursor:'pointer'}}>+ New Booking</button>
         </div>
       </header>
 
@@ -255,24 +286,67 @@ export default function AppointmentsView({ patientName }) {
                 </div>
               </div>
 
+              {/* Demo Relative Time Row */}
+              <div style={{ marginBottom: '15px' }}>
+                <label style={{ fontSize: '11px', fontWeight: '600', color: '#64748b', marginBottom: '6px', display: 'block', textTransform: 'uppercase' }}>Send me reminder in (Demo)</label>
+                <select
+                  value={reminderDelay}
+                  onChange={e => setReminderDelay(e.target.value)}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #e2e8f0', background: '#f8fafc', fontSize: '13px', color: reminderDelay ? '#1e293b' : '#94a3b8', outline: 'none', cursor: 'pointer' }}
+                >
+                  <option value="">Select a time slot...</option>
+                  <option value="1">1 minute</option>
+                  <option value="5">5 minutes</option>
+                  <option value="15">15 minutes</option>
+                  <option value="30">30 minutes</option>
+                  <option value="60">1 hour</option>
+                </select>
+              </div>
+
+              {/* Phone number (only shown if not in Firebase profile) */}
+              {!userPhone && (
+                <div style={{ marginBottom: '12px' }}>
+                  <label style={{ fontSize: '11px', fontWeight: '600', color: '#64748b', marginBottom: '6px', display: 'block', textTransform: 'uppercase' }}>Your Phone Number</label>
+                  <input
+                    type="tel"
+                    placeholder="+91XXXXXXXXXX"
+                    value={phoneOverride}
+                    onChange={e => setPhoneOverride(e.target.value)}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #e2e8f0', background: '#f8fafc', fontSize: '13px', color: '#1e293b', outline: 'none' }}
+                  />
+                </div>
+              )}
+              {userPhone && (
+                <div style={{ marginBottom: '12px', padding: '8px 12px', background: '#f0fdf4', borderRadius: '8px', border: '1px solid #bbf7d0', fontSize: '12px', color: '#166534' }}>
+                  📞 Call will go to: <strong>{userPhone}</strong>
+                </div>
+              )}
+
+              {/* Error message */}
+              {reminderError && (
+                <div style={{ marginBottom: '10px', padding: '8px 12px', background: '#fef2f2', borderRadius: '8px', border: '1px solid #fecaca', fontSize: '12px', color: '#dc2626' }}>
+                  ⚠️ {reminderError}
+                </div>
+              )}
+
               {/* Set Reminder Button */}
               <button
                 onClick={handleSetReminder}
-                disabled={!reminderDoctor || !reminderDate || !reminderTime}
+                disabled={reminderLoading || !reminderDoctor || !reminderDate || !reminderTime}
                 style={{
                   width: '100%',
                   padding: '12px',
                   borderRadius: '8px',
                   border: 'none',
-                  background: (!reminderDoctor || !reminderDate || !reminderTime) ? '#e2e8f0' : '#3b82f6',
-                  color: 'white',
+                  background: (reminderLoading || !reminderDoctor || !reminderDate || !reminderTime) ? '#e2e8f0' : '#3b82f6',
+                  color: (reminderLoading || !reminderDoctor || !reminderDate || !reminderTime) ? '#94a3b8' : 'white',
                   fontSize: '13px',
                   fontWeight: '600',
-                  cursor: (!reminderDoctor || !reminderDate || !reminderTime) ? 'not-allowed' : 'pointer',
+                  cursor: (reminderLoading || !reminderDoctor || !reminderDate || !reminderTime) ? 'not-allowed' : 'pointer',
                   transition: 'all 0.2s'
                 }}
               >
-                Set Reminder
+                {reminderLoading ? '⏳ Scheduling Call...' : '📞 Set Reminder & Call Me'}
               </button>
             </div>
 

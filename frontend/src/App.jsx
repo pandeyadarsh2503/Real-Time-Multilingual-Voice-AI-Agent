@@ -99,6 +99,13 @@ export default function App() {
   // Firebase Auth Listener
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      if (currentUser) {
+        // Augment user object with locally stored phone number if available
+        const storedPhone = localStorage.getItem(`phone_${currentUser.uid}`)
+        if (storedPhone) {
+          currentUser.phoneNumber = storedPhone
+        }
+      }
       setUser(currentUser)
       setAuthLoading(false)
     })
@@ -205,7 +212,14 @@ export default function App() {
           />
         );
       case 'Appointments':
-        return <AppointmentsView patientName={patientName} />;
+        return <AppointmentsView 
+          patientName={patientName}
+          userPhone={user?.phoneNumber || ''}
+          onNewBooking={() => {
+            setActiveTab('Home');
+            setTimeout(() => sendChatMessage('I want to book a new appointment. Which doctors are available and when?'), 100);
+          }}
+        />;
       case 'Doctors':
         return <DoctorsView 
           onBook={(docName) => {
