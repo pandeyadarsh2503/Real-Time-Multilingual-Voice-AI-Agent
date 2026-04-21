@@ -45,5 +45,5 @@ AZURE_VOICES = {
     "ta": "ta-IN-PallaviNeural",
 }
 
-GROQ_MODEL    = "llama3-70b-8192"
+GROQ_MODEL    = "llama-3.3-70b-versatile"
 WHISPER_MODEL = "base"  # Options: tiny, base, small, medium, large-v2
