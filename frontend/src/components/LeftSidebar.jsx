@@ -31,11 +31,8 @@ export default function LeftSidebar({ activeTab, setActiveTab, onLogout }) {
             {tab.icon} {tab.label}
           </a>
         ))}
-        {/* Logout Button */}
-        <a className="nav-item" onClick={onLogout} style={{ color: '#ef4444', marginTop: '16px' }}>
-          🚪 Logout
-        </a>
       </nav>
+
 
       <div className="help-widget" style={{background: 'linear-gradient(135deg, #0f766e, #115e59)', borderRadius: '16px', padding: '20px', color: 'white', marginTop: 'auto', border: '1px solid #14b8a6', boxShadow: '0 4px 6px rgba(0,0,0,0.1)'}}>
         <div className="help-title" style={{display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold', fontSize: '15px', marginBottom: '8px'}}>
@@ -46,6 +43,11 @@ export default function LeftSidebar({ activeTab, setActiveTab, onLogout }) {
           📞 Call Assistant
         </button>
       </div>
+
+      {/* Logout Button moved below Help Widget */}
+      <a className="nav-item logout-btn" onClick={onLogout} style={{ color: '#ef4444', marginTop: '16px', display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', cursor: 'pointer', borderRadius: '8px' }}>
+        🚪 Logout
+      </a>
     </aside>
   );
 }

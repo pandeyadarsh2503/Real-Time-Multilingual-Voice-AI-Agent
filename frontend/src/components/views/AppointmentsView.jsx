@@ -1,14 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { appointmentsAPI } from '../../services/api';
 
-export default function AppointmentsView() {
+export default function AppointmentsView({ patientName }) {
   const [selectedAppt, setSelectedAppt] = useState(null);
   const [appointments, setAppointments] = useState([]);
+
+  // Calendar logic
+  const today = new Date();
+  const currentMonth = today.getMonth();
+  const currentYear = today.getFullYear();
+  const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+  const firstDayOfMonth = new Date(currentYear, currentMonth, 1).getDay();
+  const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
   useEffect(() => {
     const fetchAppointments = async () => {
       try {
-        const res = await appointmentsAPI.list();
+        const res = await appointmentsAPI.list({ patient_name: patientName });
         setAppointments(res.data.map(a => ({
           id: a.id,
           doctor: a.doctor,
@@ -22,8 +30,8 @@ export default function AppointmentsView() {
         console.error('Failed to load appointments', err);
       }
     };
-    fetchAppointments();
-  }, []);
+    if (patientName) fetchAppointments();
+  }, [patientName]);
 
   return (
     <div className="view-container fade-in">
@@ -43,7 +51,7 @@ export default function AppointmentsView() {
         {/* Calendar View Mockup */}
         <div className="dashboard-card">
           <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'20px'}}>
-             <h3>October 2026</h3>
+             <h3>{monthNames[currentMonth]} {currentYear}</h3>
              <div style={{display:'flex', gap:'5px'}}>
                <button style={{padding:'5px 10px', borderRadius:'4px', border:'1px solid #ddd'}}>Week</button>
                <button style={{padding:'5px 10px', borderRadius:'4px', border:'1px solid #ddd', background:'#e2e8f0'}}>Month</button>
@@ -52,25 +60,50 @@ export default function AppointmentsView() {
           
           <div className="calendar-grid" style={{display:'grid', gridTemplateColumns:'repeat(7, 1fr)', gap:'5px'}}>
              {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(day => <div key={day} style={{textAlign:'center', fontWeight:600, color:'#64748b', padding:'5px'}}>{day}</div>)}
-             {/* Mock 31 days */}
-             {Array.from({length: 31}).map((_, i) => (
-                <div key={i} style={{
-                  height: '80px', 
-                  border: '1px solid #f1f5f9', 
-                  borderRadius: '8px', 
-                  padding: '5px',
-                  background: i===24 ? '#eff6ff' : 'white',
-                  borderTop: i===24 ? '3px solid #3b82f6' : '1px solid #f1f5f9',
-                  position: 'relative'
-                }}>
-                  <span style={{fontSize:'0.8rem', color:'#94a3b8'}}>{i+1}</span>
-                  {i===24 && <div className="appt-dot" style={{background:'#10b981', color:'white', fontSize:'0.7rem', padding:'2px', borderRadius:'4px', marginTop:'15px', textAlign:'center'}}>10:00 Dr Iyer</div>}
-                  {i===27 && <div className="appt-dot" style={{background:'#f59e0b', color:'white', fontSize:'0.7rem', padding:'2px', borderRadius:'4px', marginTop:'15px', textAlign:'center'}}>Pending</div>}
-                </div>
+             
+             {/* Empty slots for days before the 1st of the month */}
+             {Array.from({ length: firstDayOfMonth }).map((_, i) => (
+                <div key={`empty-${i}`} style={{ background: 'transparent' }}></div>
              ))}
-          </div>
-          <div style={{marginTop:'15px', fontSize:'0.85rem', color:'#ef4444'}}>
-             ⚠ Overlapping appointment detected on Oct 28
+
+             {/* Days of the month */}
+             {Array.from({length: daysInMonth}).map((_, i) => {
+                const day = i + 1;
+                const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                const dayAppts = appointments.filter(a => a.date === dateStr);
+                const isToday = day === today.getDate() && currentMonth === today.getMonth() && currentYear === today.getFullYear();
+
+                return (
+                  <div key={day} style={{
+                    height: '80px', 
+                    border: isToday ? '2px solid #3b82f6' : '1px solid #f1f5f9', 
+                    borderRadius: '8px', 
+                    padding: '5px',
+                    background: dayAppts.length > 0 ? '#eff6ff' : 'white',
+                    position: 'relative',
+                    overflow: 'hidden'
+                  }}>
+                    <span style={{fontSize:'0.8rem', color: isToday ? '#3b82f6' : '#94a3b8', fontWeight: isToday ? 'bold' : 'normal'}}>{day}</span>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '2px', height: '50px', overflowY: 'auto' }}>
+                      {dayAppts.map(appt => (
+                        <div key={appt.id} className="appt-dot" style={{
+                          background: appt.status === 'Confirmed' || appt.status === 'scheduled' ? '#10b981' : '#f59e0b', 
+                          color: 'white', 
+                          fontSize: '0.65rem', 
+                          padding: '2px 4px', 
+                          borderRadius: '4px', 
+                          textAlign: 'left',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis'
+                        }}>
+                          {appt.time} {appt.doctor.replace('Dr ', '')}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )
+             })}
           </div>
         </div>
 

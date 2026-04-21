@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { v4 as uuidv4 } from 'uuid'
 import { auth } from './firebase'
 import { onAuthStateChanged, signOut } from 'firebase/auth'
@@ -25,6 +25,7 @@ function getSessionId() {
 export default function App() {
   const audioRef = useRef(null)
   const [user, setUser]                 = useState(null)
+  const patientName                     = user?.displayName || 'Guest'
   const [authLoading, setAuthLoading]   = useState(true)
   const [sessionId]                     = useState(getSessionId)
   const [messages, setMessages]         = useState([])
@@ -50,7 +51,7 @@ export default function App() {
     const fetchDashboardData = async () => {
       try {
         const [upcomingRes, doctorsRes] = await Promise.all([
-          appointmentsAPI.upcoming(1),
+          appointmentsAPI.upcoming(1, user?.displayName || 'Guest'),
           doctorsAPI.list()
         ]);
         
@@ -184,8 +185,6 @@ export default function App() {
     return <Login />
   }
 
-  const patientName = user.displayName || 'Guest'
-
   const renderActiveView = () => {
     switch (activeTab) {
       case 'Home':
@@ -203,10 +202,11 @@ export default function App() {
             activities={activities}
             dashboardData={dashboardData}
             sendChatMessage={sendChatMessage}
+            setActiveTab={setActiveTab}
           />
         );
       case 'Appointments':
-        return <AppointmentsView />;
+        return <AppointmentsView patientName={patientName} />;
       case 'Doctors':
         return <DoctorsView 
           onBook={(docName) => {
@@ -223,7 +223,7 @@ export default function App() {
       case 'Settings':
         return <SettingsView />;
       default:
-        return <HomeView patientName={patientName} messages={messages} status={status} language={language} setLanguage={setLanguage} sessionId={sessionId} handleUserMessage={handleUserMessage} handleAIResponse={handleAIResponse} setStatus={setStatus} activities={activities} dashboardData={dashboardData} sendChatMessage={sendChatMessage} />;
+        return <HomeView patientName={patientName} messages={messages} status={status} language={language} setLanguage={setLanguage} sessionId={sessionId} handleUserMessage={handleUserMessage} handleAIResponse={handleAIResponse} setStatus={setStatus} activities={activities} dashboardData={dashboardData} sendChatMessage={sendChatMessage} setActiveTab={setActiveTab} />;
     }
   }
 

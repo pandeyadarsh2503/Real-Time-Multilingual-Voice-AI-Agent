@@ -26,13 +26,16 @@ class AppointmentOut(BaseModel):
 @router.get("/appointments", response_model=List[AppointmentOut])
 def list_appointments(
     doctor: Optional[str] = None,
+    patient_name: Optional[str] = None,
     date_filter: Optional[str] = None,
-    status: Optional[str] = "scheduled",
+    status: Optional[str] = None,
     db: Session = Depends(get_db),
 ):
     q = db.query(Appointment)
     if doctor:
         q = q.filter(Appointment.doctor == doctor)
+    if patient_name:
+        q = q.filter(Appointment.patient_name == patient_name)
     if date_filter:
         q = q.filter(Appointment.date == date_filter)
     if status:
@@ -59,16 +62,17 @@ def today_appointments(db: Session = Depends(get_db)):
 
 
 @router.get("/appointments/upcoming")
-def upcoming_appointments(limit: int = 5, db: Session = Depends(get_db)):
+def upcoming_appointments(limit: int = 5, patient_name: Optional[str] = None, db: Session = Depends(get_db)):
     """Next N scheduled appointments from today onwards."""
     today_str = date.today().strftime("%Y-%m-%d")
-    rows = (
-        db.query(Appointment)
-        .filter(Appointment.date >= today_str, Appointment.status == "scheduled")
-        .order_by(Appointment.date, Appointment.time)
-        .limit(limit)
-        .all()
+    q = db.query(Appointment).filter(
+        Appointment.date >= today_str, 
+        Appointment.status == "scheduled"
     )
+    if patient_name:
+        q = q.filter(Appointment.patient_name == patient_name)
+        
+    rows = q.order_by(Appointment.date, Appointment.time).limit(limit).all()
     return rows
 
 

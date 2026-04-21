@@ -35,7 +35,7 @@ export const voiceAPI = {
 export const appointmentsAPI = {
   list:     (params = {}) => api.get('/appointments', { params }),
   today:    ()             => api.get('/appointments/today'),
-  upcoming: (limit = 5)   => api.get('/appointments/upcoming', { params: { limit } }),
+  upcoming: (limit = 5, patientName = null)   => api.get('/appointments/upcoming', { params: { limit, patient_name: patientName } }),
   get:      (id)           => api.get(`/appointments/${id}`),
   cancel:   (id)           => api.delete(`/appointments/${id}`),
 }

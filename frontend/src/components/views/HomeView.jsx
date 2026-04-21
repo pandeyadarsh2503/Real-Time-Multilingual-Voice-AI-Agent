@@ -42,7 +42,8 @@ export default function HomeView({
   setStatus,
   activities,
   dashboardData,
-  sendChatMessage
+  sendChatMessage,
+  setActiveTab
 }) {
   const isDisabled = status === 'thinking' || status === 'speaking';
 
@@ -137,10 +138,10 @@ export default function HomeView({
         {dashboardData?.recentDoctors && (
           <div className="widget-card" style={{ background: 'white', borderRadius: '16px', padding: '20px', border: '1px solid #e5e7eb' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '15px', color: '#1f2937', fontWeight: '600', fontSize: '14px' }}>
-              Recent Doctors
+              Explore Doctors
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-              {dashboardData.recentDoctors.map((doc, index) => (
+              {dashboardData.recentDoctors.slice(0, 3).map((doc, index) => (
                 <React.Fragment key={doc.id}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }} onClick={() => sendChatMessage(`I want to book an appointment with ${doc.name}`)}>
                      <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
@@ -152,11 +153,19 @@ export default function HomeView({
                      </div>
                      <span style={{ color: '#1e3a8a' }}>›</span>
                   </div>
-                  {index < dashboardData.recentDoctors.length - 1 && (
+                  {index < 2 && index < dashboardData.recentDoctors.length - 1 && (
                     <div style={{ height: '1px', background: '#f3f4f6' }}></div>
                   )}
                 </React.Fragment>
               ))}
+              {dashboardData.recentDoctors.length > 3 && (
+                <button 
+                  onClick={() => setActiveTab('Doctors')}
+                  style={{ marginTop: '5px', width: '100%', background: '#f8fafc', color: '#3b82f6', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '10px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', transition: 'all 0.2s' }}
+                >
+                  See all doctors
+                </button>
+              )}
             </div>
           </div>
         )}
