@@ -96,9 +96,13 @@ export default function VoiceInterface({
     <div className="input-overlay">
       <div className="input-pill-container">
         
-        {/* Attachment icon */}
-        <button className="input-attach" disabled={disabled || isRecording}>
-          📎
+        {/* Inline Mic Button on the left */}
+        <button
+          className={`mic-inline-btn ${isRecording ? 'recording' : ''}`}
+          onClick={handleMic}
+          disabled={disabled}
+        >
+          {isRecording ? '⏹' : '🎤'}
         </button>
 
         {/* Text input */}
@@ -111,14 +115,7 @@ export default function VoiceInterface({
           disabled={disabled || isRecording}
         />
 
-        {/* Big Mic Button overlaying the border */}
-        <button
-          className={`mic-hero-btn ${isRecording ? 'recording' : ''}`}
-          onClick={handleMic}
-          disabled={disabled}
-        >
-          {isRecording ? '⏹' : '🎤'}
-        </button>
+
 
         {/* Send Icon */}
         <button
