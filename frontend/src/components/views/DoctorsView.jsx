@@ -1,13 +1,29 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { doctorsAPI } from '../../services/api';
 
 export default function DoctorsView() {
-  const doctors = [
-    { name: 'Dr Sharma', specialty: 'Cardiologist', rating: '4.9', reviews: 124, status: 'Available', exp: '15 Yrs', img: '👨‍⚕️', tags: ['Frequently visited', 'Recommended'] },
-    { name: 'Dr Iyer', specialty: 'General Physician', rating: '4.8', reviews: 342, status: 'Busy', exp: '20 Yrs', img: '👩‍⚕️', tags: ['Family Doctor'] },
-    { name: 'Dr Mehta', specialty: 'Dermatologist', rating: '4.7', reviews: 89, status: 'Available', exp: '8 Yrs', img: '👨‍⚕️', tags: ['Skin Care'] },
-    { name: 'Dr Reddy', specialty: 'Neurologist', rating: '4.9', reviews: 210, status: 'On Leave', exp: '22 Yrs', img: '👩‍⚕️', tags: ['Top Rated'] },
-    { name: 'Dr Gupta', specialty: 'Pediatrician', rating: '4.6', reviews: 156, status: 'Available', exp: '12 Yrs', img: '👨‍⚕️', tags: ['Kids Specialist'] }
-  ];
+  const [doctors, setDoctors] = useState([]);
+
+  useEffect(() => {
+    const fetchDocs = async () => {
+      try {
+        const res = await doctorsAPI.list();
+        setDoctors(res.data.map(d => ({
+          name: d.name,
+          specialty: d.specialty,
+          rating: '4.8',
+          reviews: 120,
+          status: 'Available',
+          exp: '10+ Yrs',
+          img: d.icon,
+          tags: ['Specialist', 'Recommended']
+        })));
+      } catch (err) {
+        console.error('Failed to load doctors', err);
+      }
+    };
+    fetchDocs();
+  }, []);
 
   return (
     <div className="view-container fade-in">

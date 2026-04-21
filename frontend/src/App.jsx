@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from 'react'
 import { v4 as uuidv4 } from 'uuid'
 import { auth } from './firebase'
 import { onAuthStateChanged, signOut } from 'firebase/auth'
+import { appointmentsAPI, doctorsAPI } from './services/api'
 
 import LeftSidebar     from './components/LeftSidebar'
 import HomeView        from './components/views/HomeView'
@@ -15,9 +16,9 @@ import Login           from './components/Login'
 
 // ── Persistent session ID ─────────────────────────────────
 function getSessionId() {
-  let id = localStorage.getItem('clinicai_session')
-  if (!id) { id = uuidv4(); localStorage.setItem('clinicai_session', id) }
-  return id
+  // Always start a fresh chat session on reload so backend memory doesn't leak
+  // into a blank frontend.
+  return uuidv4()
 }
 
 // ── Main App ──────────────────────────────────────────────
@@ -31,23 +32,10 @@ export default function App() {
   
   // Dashboard routing state
   const [activeTab, setActiveTab]       = useState('Home')
-  const [activities, setActivities]     = useState([
-    { id: 1, icon: '🚀', title: 'System Online', desc: 'Command Center active', time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) }
-  ])
+  const [activities, setActivities]     = useState([])
   const [dashboardData, setDashboardData] = useState({
-    upcomingAppointment: {
-      doctorName: 'Dr. Iyer',
-      specialty: 'General Physician',
-      status: 'Confirmed',
-      date: '23 Apr 2025 (Tomorrow)',
-      time: '10:00 AM',
-      location: 'CityCare Clinic, Room 2',
-      id: 'apt_1'
-    },
-    recentDoctors: [
-      { id: 'dr_iyer', name: 'Dr. Iyer', specialty: 'General Physician', icon: '👨‍⚕️', imgUrl: 'https://i.pravatar.cc/150?u=driyer5' },
-      { id: 'dr_mehta', name: 'Dr. Mehta', specialty: 'Dermatologist', icon: '👩‍⚕️', imgUrl: 'https://i.pravatar.cc/150?u=drmehta7' }
-    ],
+    upcomingAppointment: null,
+    recentDoctors: [],
     quickActions: [
       { id: 'book', icon: '📅', title: 'Book Appointment', bgColor: '#f0f9ff', iconColor: '#3b82f6', prompt: 'Book an appointment' },
       { id: 'check', icon: '🗓️', title: 'Check Availability', bgColor: '#f0fdf4', iconColor: '#10b981', prompt: 'Check availability' },
@@ -55,6 +43,53 @@ export default function App() {
       { id: 'cancel', icon: '❌', title: 'Cancel Appointment', bgColor: '#fef2f2', iconColor: '#ef4444', prompt: 'Cancel appointment' }
     ]
   })
+
+  useEffect(() => {
+    if (!user) return;
+    const fetchDashboardData = async () => {
+      try {
+        const [upcomingRes, doctorsRes] = await Promise.all([
+          appointmentsAPI.upcoming(1),
+          doctorsAPI.list()
+        ]);
+        
+        const upcomingAppts = upcomingRes.data;
+        let upcomingAppointment = null;
+        if (upcomingAppts && upcomingAppts.length > 0) {
+          const apt = upcomingAppts[0];
+          upcomingAppointment = {
+            id: apt.id,
+            doctorName: apt.doctor,
+            specialty: 'Specialist',
+            status: apt.status === 'scheduled' ? 'Confirmed' : apt.status,
+            date: apt.date,
+            time: apt.time,
+            location: 'Clinic',
+          };
+        }
+
+        const docs = doctorsRes.data.map(d => ({
+          id: d.name,
+          name: d.name,
+          specialty: d.specialty,
+          icon: d.icon,
+          imgUrl: `https://ui-avatars.com/api/?name=${encodeURIComponent(d.name)}&background=random`
+        }));
+
+        setDashboardData(prev => ({
+          ...prev,
+          upcomingAppointment,
+          recentDoctors: docs
+        }));
+      } catch (err) {
+        console.error('Failed to load dashboard data:', err);
+      }
+    };
+    
+    fetchDashboardData();
+    const intervalId = setInterval(fetchDashboardData, 15000);
+    return () => clearInterval(intervalId);
+  }, [user]);
 
   const addActivity = useCallback((icon, title, desc) => {
     setActivities(prev => [{ id: uuidv4(), icon, title, desc, time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) }, ...prev])

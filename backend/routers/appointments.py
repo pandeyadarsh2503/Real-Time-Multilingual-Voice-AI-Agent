@@ -6,6 +6,7 @@ from datetime import date
 
 from database.database import get_db
 from database.models import Appointment
+from config import DOCTORS
 
 router = APIRouter()
 
@@ -87,3 +88,9 @@ def cancel_appointment_endpoint(appointment_id: str, db: Session = Depends(get_d
     a.status = "cancelled"
     db.commit()
     return {"message": f"Appointment {appointment_id} cancelled."}
+
+
+@router.get("/doctors")
+def list_doctors():
+    """Return list of available doctors from config."""
+    return DOCTORS

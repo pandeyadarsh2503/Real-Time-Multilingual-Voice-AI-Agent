@@ -1,13 +1,29 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { appointmentsAPI } from '../../services/api';
 
 export default function AppointmentsView() {
   const [selectedAppt, setSelectedAppt] = useState(null);
+  const [appointments, setAppointments] = useState([]);
 
-  const appointments = [
-    { id: 1, doctor: 'Dr Iyer', time: '10:00 AM', date: 'Tomorrow', status: 'Confirmed', room: 'Consultation Room 3', notes: 'Regular checkup' },
-    { id: 2, doctor: 'Dr Sharma', time: '02:30 PM', date: 'Oct 25', status: 'Pending', room: 'Cardiology Block', notes: 'BP review' },
-    { id: 3, doctor: 'Dr Mehta', time: '11:00 AM', date: 'Oct 28', status: 'Cancelled', room: 'Dermatology Clinic', notes: 'Patient sick' }
-  ];
+  useEffect(() => {
+    const fetchAppointments = async () => {
+      try {
+        const res = await appointmentsAPI.list();
+        setAppointments(res.data.map(a => ({
+          id: a.id,
+          doctor: a.doctor,
+          time: a.time,
+          date: a.date,
+          status: a.status === 'scheduled' ? 'Confirmed' : (a.status || 'Pending'),
+          room: 'Consultation Room',
+          notes: 'Standard visit'
+        })));
+      } catch (err) {
+        console.error('Failed to load appointments', err);
+      }
+    };
+    fetchAppointments();
+  }, []);
 
   return (
     <div className="view-container fade-in">

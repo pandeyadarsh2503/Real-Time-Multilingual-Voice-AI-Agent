@@ -40,6 +40,11 @@ export const appointmentsAPI = {
   cancel:   (id)           => api.delete(`/appointments/${id}`),
 }
 
+// ── Doctors ───────────────────────────────────────────────
+export const doctorsAPI = {
+  list: () => api.get('/doctors'),
+}
+
 // ── Outbound ───────────────────────────────────────────────
 export const outboundAPI = {
   trigger:          (appointmentId, phone) =>

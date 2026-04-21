@@ -1,6 +1,20 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { outboundAPI } from '../../services/api';
 
 export default function RemindersView() {
+  const [reminders, setReminders] = useState([]);
+
+  useEffect(() => {
+    const fetchReminders = async () => {
+      try {
+        const res = await outboundAPI.upcomingReminders();
+        setReminders(res.data);
+      } catch (err) {
+        console.error('Failed to load reminders', err);
+      }
+    };
+    fetchReminders();
+  }, []);
   return (
     <div className="view-container fade-in">
       <header className="top-header" style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: '20px' }}>
@@ -26,27 +40,20 @@ export default function RemindersView() {
               </tr>
             </thead>
             <tbody>
-              <tr style={{borderBottom:'1px solid #f1f5f9'}}>
-                <td style={{padding:'10px', fontWeight:500}}>Adarsh Pandey</td>
-                <td style={{padding:'10px', color:'#64748b'}}>Dr Iyer</td>
-                <td style={{padding:'10px', color:'#64748b'}}>10:00 AM</td>
-                <td style={{padding:'10px'}}><span className="status-tag confirmed">Confirmed</span></td>
-                <td style={{padding:'10px'}}><button className="retry-btn" disabled>Called</button></td>
-              </tr>
-              <tr style={{borderBottom:'1px solid #f1f5f9'}}>
-                <td style={{padding:'10px', fontWeight:500}}>Rahul Singh</td>
-                <td style={{padding:'10px', color:'#64748b'}}>Dr Sharma</td>
-                <td style={{padding:'10px', color:'#64748b'}}>02:30 PM</td>
-                <td style={{padding:'10px'}}><span className="status-tag pending">Calling...</span></td>
-                <td style={{padding:'10px'}}><button className="retry-btn">Cancel</button></td>
-              </tr>
-              <tr style={{borderBottom:'1px solid #f1f5f9'}}>
-                <td style={{padding:'10px', fontWeight:500}}>Anita Rao</td>
-                <td style={{padding:'10px', color:'#64748b'}}>Dr Mehta</td>
-                <td style={{padding:'10px', color:'#64748b'}}>04:00 PM</td>
-                <td style={{padding:'10px'}}><span className="status-tag cancelled">No Response</span></td>
-                <td style={{padding:'10px'}}><button className="retry-btn" style={{background:'#3b82f6', color:'white', border:'none'}}>Retry Call</button></td>
-              </tr>
+              {reminders.map(r => (
+                <tr key={r.id} style={{borderBottom:'1px solid #f1f5f9'}}>
+                  <td style={{padding:'10px', fontWeight:500}}>{r.patient_name}</td>
+                  <td style={{padding:'10px', color:'#64748b'}}>{r.doctor}</td>
+                  <td style={{padding:'10px', color:'#64748b'}}>{r.time}</td>
+                  <td style={{padding:'10px'}}><span className={`status-tag ${r.status || 'pending'}`}>{r.status || 'Pending'}</span></td>
+                  <td style={{padding:'10px'}}><button className="retry-btn">Cancel</button></td>
+                </tr>
+              ))}
+              {reminders.length === 0 && (
+                <tr>
+                  <td colSpan="5" style={{padding:'20px', textAlign:'center', color:'#64748b'}}>No upcoming reminders</td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

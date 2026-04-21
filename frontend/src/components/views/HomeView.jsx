@@ -49,13 +49,13 @@ export default function HomeView({
     <div className="home-dashboard" style={{ display: 'flex', height: '100%', width: '100%', gap: '20px', padding: '20px', background: '#f9fafb' }}>
       
       {/* Center Column: Chat & Assistant */}
-      <div className="center-column" style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-        <header className="home-header" style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginBottom: '20px', alignItems: 'flex-start' }}>
+      <div className="center-column" style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0 }}>
+        <header className="home-header" style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginBottom: '20px', alignItems: 'flex-start', flexShrink: 0 }}>
           <h1 style={{ fontSize: '24px', fontWeight: 'bold', color: '#111827', margin: 0 }}>Hello, {patientName} 👋</h1>
           <p style={{ color: '#4b5563', margin: 0 }}>How can I help you today?</p>
         </header>
 
-        <div className="chat-container-card" style={{ flex: 1, background: 'white', borderRadius: '16px', border: '1px solid #e5e7eb', display: 'flex', flexDirection: 'column' }}>
+        <div className="chat-container-card" style={{ flex: 1, minHeight: 0, background: 'white', borderRadius: '16px', border: '1px solid #e5e7eb', display: 'flex', flexDirection: 'column' }}>
           <ChatWindow messages={messages} isThinking={status === 'thinking'} />
           
           <div style={{ padding: '0 20px 20px 20px' }}>
