@@ -1,10 +1,14 @@
 import { useState, useCallback, useEffect } from 'react'
 import { v4 as uuidv4 } from 'uuid'
+import { auth } from './firebase'
+import { onAuthStateChanged, signOut } from 'firebase/auth'
+
 import ChatWindow      from './components/ChatWindow'
 import VoiceInterface  from './components/VoiceInterface'
 import AppointmentCard from './components/AppointmentCard'
-import OutboundPanel   from './components/OutboundPanel' // Still there, we can transform its look
-import DoctorPanel     from './components/DoctorPanel'   // Still there, we can transform its look
+import OutboundPanel   from './components/OutboundPanel'
+import DoctorPanel     from './components/DoctorPanel'
+import Login           from './components/Login'
 
 // ── Persistent session ID ─────────────────────────────────
 function getSessionId() {
@@ -13,35 +17,8 @@ function getSessionId() {
   return id
 }
 
-function getPatientName() {
-  return localStorage.getItem('clinicai_patient_name') || ''
-}
-
-// ── Name Setup Modal ──────────────────────────────────────
-function NameModal({ onSubmit }) {
-  const [name, setName] = useState('')
-  return (
-    <div className="name-modal-overlay">
-      <div className="name-modal">
-        <h2>Welcome to SwasthyaAI 🏥</h2>
-        <p>Your AI Healthcare Companion</p>
-        <input
-          autoFocus
-          placeholder="Your full name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && name.trim() && onSubmit(name.trim())}
-        />
-        <button disabled={!name.trim()} onClick={() => onSubmit(name.trim())}>
-          Get Started
-        </button>
-      </div>
-    </div>
-  )
-}
-
 // ── Left Sidebar ──────────────────────────────────────────
-function LeftSidebar() {
+function LeftSidebar({ onLogout }) {
   return (
     <aside className="left-sidebar">
       <div className="brand-logo">
@@ -60,6 +37,8 @@ function LeftSidebar() {
         <a className="nav-item">🕒 History</a>
         <a className="nav-item">👤 Profile</a>
         <a className="nav-item">⚙️ Settings</a>
+        {/* Logout Button */}
+        <a className="nav-item" onClick={onLogout} style={{ color: '#ef4444', marginTop: '16px' }}>🚪 Logout</a>
       </nav>
 
       <div className="help-widget">
@@ -102,18 +81,24 @@ function TrustBanner() {
 
 // ── Main App ──────────────────────────────────────────────
 export default function App() {
-  const [sessionId]             = useState(getSessionId)
-  const [patientName, setPatientName] = useState(getPatientName)
-  const [messages, setMessages] = useState([])
-  const [status, setStatus]     = useState('ready')
-  const [language, setLanguage] = useState('en')
+  const [user, setUser]                 = useState(null)
+  const [authLoading, setAuthLoading]   = useState(true)
+  const [sessionId]                     = useState(getSessionId)
+  const [messages, setMessages]         = useState([])
+  const [status, setStatus]             = useState('ready')
+  const [language, setLanguage]         = useState('en')
 
-  // Show name modal on first visit
-  const showModal = !patientName
+  // Firebase Auth Listener
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser)
+      setAuthLoading(false)
+    })
+    return () => unsubscribe()
+  }, [])
 
-  const handleNameSubmit = (name) => {
-    localStorage.setItem('clinicai_patient_name', name)
-    setPatientName(name)
+  const handleLogout = () => {
+    signOut(auth)
   }
 
   const addMessage = useCallback((role, content, lang) => {
@@ -144,95 +129,95 @@ export default function App() {
     if (msgs[action]) addMessage('user', msgs[action], language)
   }, [addMessage, language])
 
-  const handleSimulatedReminder = useCallback((message) => {
-    addMessage('assistant', `📞 ${message}`, language)
-  }, [addMessage, language])
-
+  // Initial greeting trigger after login
   useEffect(() => {
-    if (patientName && messages.length === 0) {
+    if (user && messages.length === 0) {
       setMessages([{
         id: uuidv4(),
         role: 'assistant',
-        content: `Hello ${patientName}! I'm your AI healthcare assistant.\nYou can book appointments, check availability, or ask me anything.`,
+        content: `Hello ${user.displayName || 'Guest'}! I'm your AI healthcare assistant.\nYou can book appointments, check availability, or ask me anything.`,
         language: 'en',
         ts: Date.now(),
       }])
     }
-  }, [patientName]) // eslint-disable-line
+  }, [user]) // eslint-disable-line
 
   const isDisabled = status === 'thinking' || status === 'speaking'
 
+  if (authLoading) {
+    return <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center' }}>Loading...</div>
+  }
+
+  if (!user) {
+    return <Login />
+  }
+
+  const patientName = user.displayName || 'Guest'
+
   return (
-    <>
-      {showModal && <NameModal onSubmit={handleNameSubmit} />}
+    <div className="app-container">
+      
+      <LeftSidebar onLogout={handleLogout} />
 
-      <div className="app-container">
-        
-        <LeftSidebar />
-
-        <main className="center-content">
-          <header className="top-header">
-            <div className="header-titles">
-              <h1>Hello, {patientName || 'Guest'} 👋</h1>
-              <p>How can I help you today?</p>
-            </div>
-            <div className="header-controls">
-              <select className="lang-select" value={language} onChange={e => setLanguage(e.target.value)}>
-                <option value="en">🌐 English</option>
-                <option value="hi">🌐 Hindi</option>
-                <option value="ta">🌐 Tamil</option>
-              </select>
-              <div className="online-badge">
-                <div className="online-dot"></div> Online
-              </div>
-            </div>
-          </header>
-
-          <ChatWindow messages={messages} isThinking={status === 'thinking'} />
-          
-          <VoiceInterface
-            sessionId={sessionId}
-            patientName={patientName}
-            language={language}
-            setLanguage={setLanguage}
-            onMessage={handleUserMessage}
-            onResponse={handleAIResponse}
-            onStatusChange={setStatus}
-            disabled={isDisabled}
-            status={status}
-          />
-
-          <TrustBanner />
-        </main>
-
-        <aside className="right-sidebar">
-          {/* We will reuse AppointmentCard, OutboundPanel, DoctorPanel but styling them to match the new look via index.css changes */}
-          <AppointmentCard onAction={handleAppointmentAction} />
-          
-          {/* Quick Actions (Replacing Outbound Panel visual with Quick Actions) */}
-          <div className="widget-card">
-            <div className="widget-header">💼 Quick Actions</div>
-            <div className="actions-grid">
-              <button className="action-box blue" onClick={() => handleUserMessage("Book an appointment", language)}>
-                <span className="icon">📅</span> Book Appointment
-              </button>
-              <button className="action-box green" onClick={() => handleUserMessage("Check availability", language)}>
-                <span className="icon">🗓️</span> Check Availability
-              </button>
-              <button className="action-box orange" onClick={() => handleUserMessage("Reschedule my appointment", language)}>
-                <span className="icon">🔄</span> Reschedule Appointment
-              </button>
-              <button className="action-box red" onClick={() => handleUserMessage("Cancel appointment", language)}>
-                <span className="icon">✂️</span> Cancel Appointment
-              </button>
+      <main className="center-content">
+        <header className="top-header">
+          <div className="header-titles">
+            <h1>Hello, {patientName} 👋</h1>
+            <p>How can I help you today?</p>
+          </div>
+          <div className="header-controls">
+            <select className="lang-select" value={language} onChange={e => setLanguage(e.target.value)}>
+              <option value="en">🌐 English</option>
+              <option value="hi">🌐 Hindi</option>
+              <option value="ta">🌐 Tamil</option>
+            </select>
+            <div className="online-badge">
+              <div className="online-dot"></div> Online
             </div>
           </div>
-          
-          {/* Outbound as an invisible/mini tool or at bottom to preserve feature */}
-          <DoctorPanel onDoctorSelect={handleDoctorSelect} />
-        </aside>
+        </header>
 
-      </div>
-    </>
+        <ChatWindow messages={messages} isThinking={status === 'thinking'} />
+        
+        <VoiceInterface
+          sessionId={sessionId}
+          patientName={patientName}
+          language={language}
+          setLanguage={setLanguage}
+          onMessage={handleUserMessage}
+          onResponse={handleAIResponse}
+          onStatusChange={setStatus}
+          disabled={isDisabled}
+          status={status}
+        />
+
+        <TrustBanner />
+      </main>
+
+      <aside className="right-sidebar">
+        <AppointmentCard onAction={handleAppointmentAction} />
+        
+        <div className="widget-card">
+          <div className="widget-header">💼 Quick Actions</div>
+          <div className="actions-grid">
+            <button className="action-box blue" onClick={() => handleUserMessage("Book an appointment", language)}>
+              <span className="icon">📅</span> Book Appointment
+            </button>
+            <button className="action-box green" onClick={() => handleUserMessage("Check availability", language)}>
+              <span className="icon">🗓️</span> Check Availability
+            </button>
+            <button className="action-box orange" onClick={() => handleUserMessage("Reschedule my appointment", language)}>
+              <span className="icon">🔄</span> Reschedule Appointment
+            </button>
+            <button className="action-box red" onClick={() => handleUserMessage("Cancel appointment", language)}>
+              <span className="icon">✂️</span> Cancel Appointment
+            </button>
+          </div>
+        </div>
+        
+        <DoctorPanel onDoctorSelect={handleDoctorSelect} />
+      </aside>
+
+    </div>
   )
 }
