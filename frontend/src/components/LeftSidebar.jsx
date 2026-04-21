@@ -2,13 +2,10 @@ import React from 'react';
 
 export default function LeftSidebar({ activeTab, setActiveTab, onLogout }) {
   const tabs = [
-    { id: 'Home', icon: '🏠', label: 'Home' },
-    { id: 'Appointments', icon: '📅', label: 'Appointments' },
-    { id: 'Doctors', icon: '👨‍⚕️', label: 'Doctors' },
-    { id: 'Reminders', icon: '🔔', label: 'Reminders' },
-    { id: 'History', icon: '🕒', label: 'History' },
-    { id: 'Profile', icon: '👤', label: 'Profile' },
-    { id: 'Settings', icon: '⚙️', label: 'Settings' },
+    { id: 'Home', label: 'Home' },
+    { id: 'Appointments', label: 'Appointments' },
+    { id: 'Doctors', label: 'Doctors' },
+    { id: 'History', label: 'History' },
   ];
 
   return (
@@ -28,7 +25,7 @@ export default function LeftSidebar({ activeTab, setActiveTab, onLogout }) {
             className={`nav-item ${activeTab === tab.id ? 'active' : ''}`}
             onClick={() => setActiveTab(tab.id)}
           >
-            {tab.icon} {tab.label}
+            {tab.label}
           </a>
         ))}
       </nav>
@@ -36,7 +33,7 @@ export default function LeftSidebar({ activeTab, setActiveTab, onLogout }) {
 
       <div className="help-widget" style={{background: 'linear-gradient(135deg, #0f766e, #115e59)', borderRadius: '16px', padding: '20px', color: 'white', marginTop: 'auto', border: '1px solid #14b8a6', boxShadow: '0 4px 6px rgba(0,0,0,0.1)'}}>
         <div className="help-title" style={{display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold', fontSize: '15px', marginBottom: '8px'}}>
-          <span style={{color: 'white', fontSize: '18px'}}>📞</span> Need Help?
+          Need Help?
         </div>
         <div className="help-desc" style={{fontSize: '12px', opacity: 0.9, marginBottom: '20px', lineHeight: 1.5}}>Talk to our assistant now or call us.</div>
         <button className="help-btn" onClick={() => alert("Initiating Exotel call or browser-based voice simulation...")} style={{background: 'rgba(20, 184, 166, 0.2)', border: '1px solid #14b8a6', borderRadius: '8px', padding: '10px 12px', width: '100%', color: 'white', fontSize: '13px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'}}>
@@ -46,7 +43,7 @@ export default function LeftSidebar({ activeTab, setActiveTab, onLogout }) {
 
       {/* Logout Button moved below Help Widget */}
       <a className="nav-item logout-btn" onClick={onLogout} style={{ color: '#ef4444', marginTop: '16px', display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', cursor: 'pointer', borderRadius: '8px' }}>
-        🚪 Logout
+        Logout
       </a>
     </aside>
   );

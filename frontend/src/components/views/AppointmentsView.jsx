@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { appointmentsAPI } from '../../services/api';
+import { appointmentsAPI, outboundAPI } from '../../services/api';
 
 export default function AppointmentsView({ patientName }) {
   const [selectedAppt, setSelectedAppt] = useState(null);
   const [appointments, setAppointments] = useState([]);
+  const [reminders, setReminders] = useState([]);
 
   // Calendar logic
   const today = new Date();
@@ -26,8 +27,11 @@ export default function AppointmentsView({ patientName }) {
           room: 'Consultation Room',
           notes: 'Standard visit'
         })));
+        
+        const remRes = await outboundAPI.upcomingReminders();
+        setReminders(remRes.data.filter(r => r.patient_name === patientName));
       } catch (err) {
-        console.error('Failed to load appointments', err);
+        console.error('Failed to load appointments/reminders', err);
       }
     };
     if (patientName) fetchAppointments();
@@ -37,8 +41,8 @@ export default function AppointmentsView({ patientName }) {
     <div className="view-container fade-in">
       <header className="top-header" style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: '20px' }}>
         <div className="header-titles">
-          <h1>Calendar & Appointments</h1>
-          <p>Manage your schedules, conflicts and history</p>
+          <h1>Calendar & Reminders</h1>
+          <p>Manage your schedules, conflicts and automated voice calls</p>
         </div>
         <div className="header-actions" style={{display:'flex', gap:'10px'}}>
           <button className="primary-btn" style={{background:'#3b82f6', color:'white', padding:'8px 16px', borderRadius:'8px', border:'none'}}>+ New Booking</button>
@@ -142,6 +146,45 @@ export default function AppointmentsView({ patientName }) {
             )}
         </div>
       </div>
+
+      <div style={{marginTop: '30px'}}>
+        <div className="dashboard-card">
+          <h3>Automated Voice Reminders</h3>
+          <p style={{fontSize:'0.85rem', color:'#64748b', marginBottom:'15px'}}>AI will automatically call you to confirm these appointments.</p>
+          <table style={{width:'100%', marginTop:'15px', borderCollapse:'collapse', fontSize:'0.9rem'}}>
+            <thead>
+              <tr style={{textAlign:'left', borderBottom:'2px solid #f1f5f9'}}>
+                <th style={{padding:'10px'}}>Doctor</th>
+                <th style={{padding:'10px'}}>Date</th>
+                <th style={{padding:'10px'}}>Time</th>
+                <th style={{padding:'10px'}}>Status</th>
+                <th style={{padding:'10px'}}>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {reminders.map(r => (
+                <tr key={r.id} style={{borderBottom:'1px solid #f1f5f9'}}>
+                  <td style={{padding:'10px', fontWeight:500, color:'#1e293b'}}>{r.doctor}</td>
+                  <td style={{padding:'10px', color:'#64748b'}}>{r.date}</td>
+                  <td style={{padding:'10px', color:'#64748b'}}>{r.time}</td>
+                  <td style={{padding:'10px'}}><span className={`status-tag ${r.status || 'pending'}`}>{r.status || 'Pending'}</span></td>
+                  <td style={{padding:'10px'}}>
+                    <button style={{padding:'6px 12px', background:'#10b981', color:'white', border:'none', borderRadius:'6px', fontWeight:600, cursor:'pointer', fontSize: '0.8rem'}}>
+                      📞 Trigger Demo Call
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {reminders.length === 0 && (
+                <tr>
+                  <td colSpan="5" style={{padding:'20px', textAlign:'center', color:'#64748b'}}>No upcoming AI reminders</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import ChatWindow from '../ChatWindow';
 import VoiceInterface from '../VoiceInterface';
 
@@ -46,6 +46,7 @@ export default function HomeView({
   setActiveTab
 }) {
   const isDisabled = status === 'thinking' || status === 'speaking';
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
 
   return (
     <div className="home-dashboard" style={{ display: 'flex', height: '100%', width: '100%', gap: '20px', padding: '20px', background: '#f9fafb' }}>
@@ -60,7 +61,7 @@ export default function HomeView({
         <div className="chat-container-card" style={{ flex: 1, minHeight: 0, background: 'white', borderRadius: '16px', border: '1px solid #e5e7eb', display: 'flex', flexDirection: 'column' }}>
           <ChatWindow messages={messages} isThinking={status === 'thinking'} />
           
-          <div style={{ padding: '0 20px 20px 20px' }}>
+          <div style={{ padding: '0 20px 10px 20px' }}>
             <VoiceInterface
               language={language}
               setLanguage={setLanguage}
@@ -87,6 +88,63 @@ export default function HomeView({
           </select>
           <div className="online-badge" style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#ecfdf5', color: '#065f46', padding: '8px 12px', borderRadius: '20px', fontSize: '13px', fontWeight: '500' }}>
             <div style={{ width: '8px', height: '8px', background: '#10b981', borderRadius: '50%' }}></div> Online
+          </div>
+          
+          <div style={{ position: 'relative' }}>
+             <div 
+               onClick={() => setShowProfileMenu(!showProfileMenu)}
+               style={{
+                 width: '40px',
+                 height: '40px',
+                 borderRadius: '50%',
+                 background: '#3b82f6',
+                 display: 'flex',
+                 alignItems: 'center',
+                 justifyContent: 'center',
+                 fontSize: '1.1rem',
+                 color: 'white',
+                 cursor: 'pointer',
+                 boxShadow: '0 2px 5px rgba(59,130,246,0.3)',
+                 fontWeight: 'bold',
+                 marginLeft: '5px'
+               }}
+             >
+               {(patientName || 'G')[0].toUpperCase()}
+             </div>
+             
+             {showProfileMenu && (
+               <div style={{
+                 position: 'absolute',
+                 top: '50px',
+                 right: '0',
+                 background: 'white',
+                 border: '1px solid #e5e7eb',
+                 borderRadius: '12px',
+                 boxShadow: '0 4px 15px rgba(0,0,0,0.1)',
+                 padding: '8px 0',
+                 width: '150px',
+                 zIndex: 1000,
+                 display: 'flex',
+                 flexDirection: 'column'
+               }}>
+                 <button 
+                   onClick={() => { setShowProfileMenu(false); setActiveTab('Profile'); }}
+                   style={{ padding: '10px 16px', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', fontSize: '14px', color: '#1f2937', fontWeight: '500' }}
+                   onMouseEnter={(e) => e.target.style.background = '#f9fafb'}
+                   onMouseLeave={(e) => e.target.style.background = 'none'}
+                 >
+                   👤 My Profile
+                 </button>
+                 <button 
+                   onClick={() => { setShowProfileMenu(false); setActiveTab('Settings'); }}
+                   style={{ padding: '10px 16px', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', fontSize: '14px', color: '#1f2937', fontWeight: '500' }}
+                   onMouseEnter={(e) => e.target.style.background = '#f9fafb'}
+                   onMouseLeave={(e) => e.target.style.background = 'none'}
+                 >
+                   ⚙️ Settings
+                 </button>
+               </div>
+             )}
           </div>
         </div>
 

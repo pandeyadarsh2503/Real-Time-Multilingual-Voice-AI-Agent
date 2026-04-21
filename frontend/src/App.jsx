@@ -8,7 +8,6 @@ import LeftSidebar     from './components/LeftSidebar'
 import HomeView        from './components/views/HomeView'
 import AppointmentsView from './components/views/AppointmentsView'
 import DoctorsView     from './components/views/DoctorsView'
-import RemindersView   from './components/views/RemindersView'
 import HistoryView     from './components/views/HistoryView'
 import ProfileView     from './components/views/ProfileView'
 import SettingsView    from './components/views/SettingsView'
@@ -214,8 +213,6 @@ export default function App() {
             setTimeout(() => sendChatMessage(`I want to book an appointment with ${docName}`), 100);
           }} 
         />;
-      case 'Reminders':
-        return <RemindersView />;
       case 'History':
         return <HistoryView />;
       case 'Profile':
@@ -231,7 +228,7 @@ export default function App() {
     <div className="app-container">
       <LeftSidebar activeTab={activeTab} setActiveTab={setActiveTab} onLogout={handleLogout} />
       
-      <main className="center-content full-width">
+      <main className="center-content full-width" style={{ position: 'relative' }}>
          {renderActiveView()}
       </main>
     </div>
