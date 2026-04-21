@@ -14,6 +14,40 @@ client = Groq(api_key=settings.GROQ_API_KEY)
 DOCTORS_TEXT = "\n".join([f"  {i+1}. {d['name']} — {d['specialty']} | {d.get('availability', '')} | {', '.join(d.get('languages', []))}" for i, d in enumerate(DOCTORS)])
 DOCTORS_EXAMPLE = ", ".join([f"'{d}'" for d in DOCTOR_NAMES[:3]]) + " etc."
 
+# ── Outbound Call System Prompt ────────────────────────────
+OUTBOUND_SYSTEM_PROMPT = """\
+You are a multilingual AI voice assistant making an outbound call to a patient on behalf of a healthcare clinic.
+Your goal is to communicate clearly, politely, and efficiently.
+
+LANGUAGE RULE:
+- Respond ONLY in the language specified in the input.
+- Supported: English, Hindi (Devanagari script), Tamil (Tamil script).
+
+RESPONSE RULES:
+- Keep the message SHORT — maximum 2 sentences.
+- Be polite and conversational.
+- Clearly mention: patient name, doctor name, appointment date & time.
+- ALWAYS end with a clear question: confirm or reschedule?
+
+PURPOSE-SPECIFIC BEHAVIOR:
+1. reminder  → Inform about upcoming appointment. Ask to confirm or reschedule.
+   Example: "Hello {name}, this is a reminder for your appointment with {doctor} {date} at {time}. Would you like to confirm or reschedule?"
+2. followup  → Ask about health status after visit. Offer to book a follow-up.
+   Example: "Hello {name}, we're checking in after your recent visit with {doctor}. Would you like to book a follow-up appointment?"
+3. missed    → Mention missed appointment politely. Offer rescheduling.
+   Example: "Hello {name}, it seems you missed your appointment with {doctor} today. Would you like to reschedule it?"
+
+STRICT RULES:
+- Do NOT generate long explanations.
+- Do NOT include technical details or JSON.
+- Do NOT assume confirmation.
+- Do NOT hallucinate any information not provided.
+- Do NOT exceed 2 sentences.
+
+OUTPUT FORMAT:
+Return ONLY the spoken message text. No JSON. No extra explanation.
+"""
+
 # ── System Prompt ──────────────────────────────────────────
 SYSTEM_PROMPT = """\
 You are ClinicAI — a real-time multilingual AI voice assistant for a healthcare clinic.
@@ -216,3 +250,40 @@ async def run_agent(messages: list, tool_executor, max_iter: int = 6) -> tuple[s
             })
 
     return "I'm sorry, I couldn't complete that action. Please try again.", msgs
+
+
+# ── Outbound Call Message Generator ────────────────────────
+async def generate_outbound_message(
+    name: str,
+    doctor: str,
+    date: str,
+    time: str,
+    purpose: str,   # "reminder" | "followup" | "missed"
+    language: str,  # "English" | "Hindi" | "Tamil"
+) -> str:
+    """
+    Generate a short, spoken outbound call message for the patient.
+    Returns plain text — no JSON, no extra formatting.
+    """
+    user_prompt = (
+        f"Generate an outbound call message with the following context:\n"
+        f"Name: {name}\n"
+        f"Doctor: {doctor}\n"
+        f"Date: {date}\n"
+        f"Time: {time}\n"
+        f"Purpose: {purpose}\n"
+        f"Language: {language}\n"
+        f"\nReturn ONLY the spoken message text."
+    )
+
+    response = client.chat.completions.create(
+        model=GROQ_MODEL,
+        messages=[
+            {"role": "system", "content": OUTBOUND_SYSTEM_PROMPT},
+            {"role": "user",   "content": user_prompt},
+        ],
+        max_tokens=150,
+        temperature=0.4,
+    )
+
+    return (response.choices[0].message.content or "").strip()

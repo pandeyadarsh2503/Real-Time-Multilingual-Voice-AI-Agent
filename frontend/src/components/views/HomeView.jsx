@@ -49,7 +49,7 @@ export default function HomeView({
   const [showProfileMenu, setShowProfileMenu] = useState(false);
 
   return (
-    <div className="home-dashboard" style={{ display: 'flex', height: '100%', width: '100%', gap: '20px', padding: '20px', background: '#f9fafb' }}>
+    <div className="home-dashboard" style={{ display: 'flex', height: '100%', width: '100%', gap: '32px', padding: '32px 48px', background: '#f9fafb' }}>
       
       {/* Center Column: Chat & Assistant */}
       <div className="center-column" style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0 }}>
@@ -77,7 +77,7 @@ export default function HomeView({
       </div>
 
       {/* Right Column: Widgets */}
-      <div className="right-sidebar" style={{ width: '320px', display: 'flex', flexDirection: 'column', gap: '20px', flexShrink: 0 }}>
+      <div className="right-sidebar" style={{ width: '320px', display: 'flex', flexDirection: 'column', gap: '20px', flexShrink: 0, overflow: 'hidden' }}>
         
         {/* Top Controls */}
         <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', alignItems: 'center' }}>
@@ -150,6 +150,7 @@ export default function HomeView({
 
         {/* Upcoming Appointment */}
         {dashboardData?.upcomingAppointment && (
+
           <div className="widget-card" style={{ background: 'white', borderRadius: '16px', padding: '20px', border: '1px solid #e5e7eb' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '15px', color: '#1f2937', fontWeight: '600', fontSize: '14px' }}>
               <span style={{ color: '#3b82f6' }}>📅</span> Upcoming Appointment

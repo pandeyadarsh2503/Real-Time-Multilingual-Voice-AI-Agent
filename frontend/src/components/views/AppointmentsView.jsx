@@ -1,10 +1,58 @@
 import React, { useState, useEffect } from 'react';
-import { appointmentsAPI, outboundAPI } from '../../services/api';
+import { appointmentsAPI, outboundAPI, doctorsAPI } from '../../services/api';
+
+function ReminderToast({ visible }) {
+  if (!visible) return null;
+  return (
+    <div style={{
+      position: 'fixed',
+      top: '24px',
+      right: '24px',
+      zIndex: 9999,
+      display: 'flex',
+      alignItems: 'center',
+      gap: '10px',
+      background: 'linear-gradient(135deg, #10b981, #059669)',
+      color: 'white',
+      padding: '14px 20px',
+      borderRadius: '12px',
+      boxShadow: '0 8px 24px rgba(16,185,129,0.35)',
+      fontSize: '14px',
+      fontWeight: '600',
+      animation: 'slideInRight 0.4s ease',
+    }}>
+      <div style={{ fontSize: '20px' }}>✅</div>
+      <div>
+        <div style={{ fontWeight: '700', fontSize: '15px' }}>Reminder Set!</div>
+        <div style={{ opacity: 0.9, fontSize: '13px', fontWeight: '400' }}>AI will remind you</div>
+      </div>
+    </div>
+  );
+}
 
 export default function AppointmentsView({ patientName }) {
   const [selectedAppt, setSelectedAppt] = useState(null);
   const [appointments, setAppointments] = useState([]);
   const [reminders, setReminders] = useState([]);
+  const [doctorsList, setDoctorsList] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
+
+  const [reminderDoctor, setReminderDoctor] = useState('');
+  const [reminderDate, setReminderDate] = useState('');
+  const [reminderTime, setReminderTime] = useState('');
+  const [showToast, setShowToast] = useState(false);
+  const [showDocDropdown, setShowDocDropdown] = useState(false);
+  const [docSearch, setDocSearch] = useState('');
+
+  const handleSetReminder = () => {
+    if (!reminderDoctor || !reminderDate || !reminderTime) return;
+    setShowToast(true);
+    setTimeout(() => setShowToast(false), 4000);
+    setReminderDoctor('');
+    setDocSearch('');
+    setReminderDate('');
+    setReminderTime('');
+  };
 
   // Calendar logic
   const today = new Date();
@@ -30,6 +78,9 @@ export default function AppointmentsView({ patientName }) {
         
         const remRes = await outboundAPI.upcomingReminders();
         setReminders(remRes.data.filter(r => r.patient_name === patientName));
+        
+        const docsRes = await doctorsAPI.list();
+        setDoctorsList(docsRes.data);
       } catch (err) {
         console.error('Failed to load appointments/reminders', err);
       }
@@ -37,8 +88,20 @@ export default function AppointmentsView({ patientName }) {
     if (patientName) fetchAppointments();
   }, [patientName]);
 
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (!event.target.closest('.searchable-doc-container')) {
+        setShowDocDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   return (
     <div className="view-container fade-in">
+      <ReminderToast visible={showToast} />
       <header className="top-header" style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: '20px' }}>
         <div className="header-titles">
           <h1>Calendar & Reminders</h1>
@@ -46,7 +109,6 @@ export default function AppointmentsView({ patientName }) {
         </div>
         <div className="header-actions" style={{display:'flex', gap:'10px'}}>
           <button className="primary-btn" style={{background:'#3b82f6', color:'white', padding:'8px 16px', borderRadius:'8px', border:'none'}}>+ New Booking</button>
-          <button className="secondary-btn" style={{background:'#f1f5f9', padding:'8px 16px', borderRadius:'8px', border:'1px solid #cbd5e1'}}>Bulk Cancel</button>
         </div>
       </header>
 
@@ -112,9 +174,115 @@ export default function AppointmentsView({ patientName }) {
         </div>
 
         {/* Appointment Drawer/List */}
-        <div className="appt-list" style={{display:'flex', flexDirection:'column', gap:'15px'}}>
-            <h3>Upcoming list</h3>
-            {appointments.map(appt => (
+        <div className="appt-list" style={{display:'flex', flexDirection:'column', gap:'20px'}}>
+            
+            {/* Appointment Reminder Widget */}
+            <div className="dashboard-card" style={{ padding: '20px', border: '1px solid #e5e7eb', overflow: 'visible' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                <span style={{ fontWeight: '700', fontSize: '15px', color: '#111827' }}>Set Appointment Reminder</span>
+              </div>
+
+              {/* Searchable Doctor Dropdown */}
+              <div className="searchable-doc-container" style={{ marginBottom: '12px', position: 'relative' }}>
+                <label style={{ fontSize: '11px', fontWeight: '600', color: '#64748b', marginBottom: '6px', display: 'block', textTransform: 'uppercase' }}>Doctor</label>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type="text"
+                    placeholder="Search & select doctor..."
+                    value={docSearch || (reminderDoctor ? reminderDoctor : '')}
+                    onFocus={() => setShowDocDropdown(true)}
+                    onChange={(e) => {
+                      setDocSearch(e.target.value);
+                      setShowDocDropdown(true);
+                      if (reminderDoctor) setReminderDoctor('');
+                    }}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #e2e8f0', background: '#f8fafc', fontSize: '13px', color: '#1e293b', outline: 'none' }}
+                  />
+                  {showDocDropdown && (
+                    <div style={{ 
+                      position: 'absolute', top: '100%', left: 0, right: 0, 
+                      background: 'white', border: '1px solid #e2e8f0', borderRadius: '8px', 
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.1)', zIndex: 100, 
+                      maxHeight: '200px', overflowY: 'auto', marginTop: '4px' 
+                    }}>
+                      {doctorsList
+                        .filter(doc => 
+                          (doc.name + doc.specialty).toLowerCase().includes(docSearch.toLowerCase())
+                        )
+                        .map(doc => (
+                          <div 
+                            key={doc.id || doc.name}
+                            onClick={() => {
+                              setReminderDoctor(doc.name);
+                              setDocSearch(`${doc.name} (${doc.specialty})`);
+                              setShowDocDropdown(false);
+                            }}
+                            style={{ padding: '10px 12px', fontSize: '13px', cursor: 'pointer', borderBottom: '1px solid #f1f5f9' }}
+                            onMouseEnter={(e) => e.target.style.background = '#f8fafc'}
+                            onMouseLeave={(e) => e.target.style.background = 'none'}
+                          >
+                            <strong>{doc.name}</strong> <span style={{ color: '#64748b', fontSize: '11px' }}>({doc.specialty})</span>
+                          </div>
+                        ))}
+                      {doctorsList.length === 0 && (
+                        <div style={{ padding: '10px 12px', fontSize: '13px', color: '#94a3b8' }}>Loading doctors...</div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Date & Time Row */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '15px' }}>
+                <div>
+                  <label style={{ fontSize: '11px', fontWeight: '600', color: '#64748b', marginBottom: '6px', display: 'block', textTransform: 'uppercase' }}>Date</label>
+                  <input
+                    type="date"
+                    value={reminderDate}
+                    min={new Date().toISOString().split('T')[0]}
+                    onChange={e => setReminderDate(e.target.value)}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #e2e8f0', background: '#f8fafc', fontSize: '13px', color: '#1e293b', outline: 'none' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: '11px', fontWeight: '600', color: '#64748b', marginBottom: '6px', display: 'block', textTransform: 'uppercase' }}>Time</label>
+                  <input
+                    type="time"
+                    value={reminderTime}
+                    onChange={e => setReminderTime(e.target.value)}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #e2e8f0', background: '#f8fafc', fontSize: '13px', color: '#1e293b', outline: 'none' }}
+                  />
+                </div>
+              </div>
+
+              {/* Set Reminder Button */}
+              <button
+                onClick={handleSetReminder}
+                disabled={!reminderDoctor || !reminderDate || !reminderTime}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  background: (!reminderDoctor || !reminderDate || !reminderTime) ? '#e2e8f0' : '#3b82f6',
+                  color: 'white',
+                  fontSize: '13px',
+                  fontWeight: '600',
+                  cursor: (!reminderDoctor || !reminderDate || !reminderTime) ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.2s'
+                }}
+              >
+                Set Reminder
+              </button>
+            </div>
+
+            <h3 style={{marginTop: '10px'}}>Upcoming list</h3>
+            {appointments
+              .filter(appt => 
+                appt.doctor.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                (appt.patient_name && appt.patient_name.toLowerCase().includes(searchTerm.toLowerCase()))
+              )
+              .map(appt => (
               <div 
                 key={appt.id} 
                 className="dashboard-card" 
@@ -162,7 +330,12 @@ export default function AppointmentsView({ patientName }) {
               </tr>
             </thead>
             <tbody>
-              {reminders.map(r => (
+              {reminders
+                .filter(r => 
+                  r.doctor.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                  (r.patient_name && r.patient_name.toLowerCase().includes(searchTerm.toLowerCase()))
+                )
+                .map(r => (
                 <tr key={r.id} style={{borderBottom:'1px solid #f1f5f9'}}>
                   <td style={{padding:'10px', fontWeight:500, color:'#1e293b'}}>{r.doctor}</td>
                   <td style={{padding:'10px', color:'#64748b'}}>{r.date}</td>

@@ -2,11 +2,13 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from datetime import date, timedelta
+from typing import Optional
 import logging
 
 from database.database import get_db
 from database.models import Appointment, OutboundCampaign
 from services.exotel_service import initiate_reminder_call
+from services.llm_service import generate_outbound_message
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -19,6 +21,20 @@ class TriggerRequest(BaseModel):
 
 class SimulateRequest(BaseModel):
     appointment_id: str
+
+
+class GenerateMessageRequest(BaseModel):
+    name: str
+    doctor: str
+    date: str
+    time: str
+    purpose: str          # "reminder" | "followup" | "missed"
+    language: str = "English"   # "English" | "Hindi" | "Tamil"
+
+
+class PatientResponseRequest(BaseModel):
+    appointment_id: str
+    response: str         # "confirm" | "reschedule" | "no"
 
 
 # ── Live Exotel call ───────────────────────────────────────
@@ -58,6 +74,16 @@ async def simulate_reminder(req: SimulateRequest, db: Session = Depends(get_db))
     if not appt:
         raise HTTPException(status_code=404, detail="Appointment not found")
 
+    # Generate AI message
+    message = await generate_outbound_message(
+        name=appt.patient_name,
+        doctor=appt.doctor,
+        date=appt.date,
+        time=appt.time,
+        purpose="reminder",
+        language="English" # Default for simulation
+    )
+
     return {
         "type": "outbound_reminder",
         "appointment_id": appt.id,
@@ -65,11 +91,7 @@ async def simulate_reminder(req: SimulateRequest, db: Session = Depends(get_db))
         "doctor": appt.doctor,
         "date": appt.date,
         "time": appt.time,
-        "message": (
-            f"Hello {appt.patient_name}, this is a reminder from the clinic. "
-            f"You have an appointment with {appt.doctor} on {appt.date} at {appt.time}. "
-            f"Would you like to confirm, reschedule, or cancel?"
-        ),
+        "message": message
     }
 
 
@@ -125,3 +147,65 @@ def upcoming_reminders(db: Session = Depends(get_db)):
         }
         for a in rows
     ]
+
+
+# ── AI-generated outbound message ───────────────────────────
+@router.post("/outbound/generate-message")
+async def generate_message(req: GenerateMessageRequest):
+    """
+    Use the LLM to generate a short, multilingual spoken message
+    for an outbound patient call. Supports: reminder, followup, missed.
+    """
+    message = await generate_outbound_message(
+        name=req.name,
+        doctor=req.doctor,
+        date=req.date,
+        time=req.time,
+        purpose=req.purpose,
+        language=req.language,
+    )
+    return {
+        "purpose":  req.purpose,
+        "language": req.language,
+        "message":  message,
+    }
+
+
+# ── Handle patient call response ────────────────────────────
+@router.post("/outbound/respond")
+async def handle_patient_response(
+    req: PatientResponseRequest,
+    db: Session = Depends(get_db),
+):
+    """
+    Handle the patient's verbal/button response during an outbound call.
+    - confirm    → mark appointment as confirmed
+    - reschedule → initiate rescheduling (returns action to caller)
+    - no / cancel→ acknowledge and end
+    """
+    appt = db.query(Appointment).filter(Appointment.id == req.appointment_id).first()
+    if not appt:
+        raise HTTPException(status_code=404, detail="Appointment not found")
+
+    response_lower = req.response.strip().lower()
+
+    if response_lower in ("confirm", "yes", "yes confirm", "1"):
+        appt.status = "confirmed"
+        db.commit()
+        return {
+            "action":  "confirmed",
+            "message": f"Great! Your appointment with {appt.doctor} on {appt.date} at {appt.time} is confirmed. See you then!",
+        }
+
+    elif response_lower in ("reschedule", "2"):
+        return {
+            "action":  "reschedule",
+            "message": "Sure! Please let us know your preferred date and time and we will reschedule your appointment.",
+            "appointment_id": appt.id,
+        }
+
+    else:  # "no", "cancel", "3", etc.
+        return {
+            "action":  "acknowledged",
+            "message": "Understood. Thank you for your time. Have a great day!",
+        }
