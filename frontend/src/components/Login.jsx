@@ -29,7 +29,6 @@ export default function Login() {
         
         const userCred = await createUserWithEmailAndPassword(auth, email, password)
         await updateProfile(userCred.user, { displayName: name })
-        // Store phone number locally for demo simulation (or push to backend DB)
         localStorage.setItem(`phone_${userCred.user.uid}`, phone)
       } else {
         if (!email.trim()) throw new Error("Email is required.");
@@ -44,89 +43,114 @@ export default function Login() {
   }
 
   return (
-    <div style={{
-      width: '100%', height: '100vh',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: 'var(--bg-body)'
-    }}>
-      <form className="widget-card" style={{ width: '400px', display: 'flex', flexDirection: 'column', gap: '16px' }} onSubmit={handleSubmit}>
-        <div style={{ textAlign: 'center', marginBottom: '8px' }}>
-          <div style={{ fontSize: '32px', marginBottom: '8px' }}>🏥</div>
-          <h2 style={{ fontSize: '24px', fontWeight: '700' }}>SwasthyaAI</h2>
-          <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Your AI Healthcare Companion</p>
-        </div>
-
-        {error && (
-          <div style={{ background: '#fef2f2', color: '#b91c1c', padding: '12px', borderRadius: '8px', fontSize: '13px' }}>
-            {error}
+    <div className="auth-page-container">
+      <div className="auth-hero-section">
+        <div className="auth-hero-content">
+          <div className="auth-logo">🏥 SwasthyaAI</div>
+          <h1 className="auth-hero-title">Your AI Healthcare Companion</h1>
+          <p className="auth-hero-subtitle">
+            Seamlessly manage your appointments, get AI-powered reminders, and take control of your health with intelligent voice assistance.
+          </p>
+          <div className="auth-features">
+            <div className="auth-feature-item">
+              <span className="auth-feature-icon">🎙️</span>
+              <div>
+                <h4>Voice Enabled</h4>
+                <p>Interact naturally in multiple languages.</p>
+              </div>
+            </div>
+            <div className="auth-feature-item">
+              <span className="auth-feature-icon">📅</span>
+              <div>
+                <h4>Smart Scheduling</h4>
+                <p>Book and manage appointments effortlessly.</p>
+              </div>
+            </div>
           </div>
-        )}
+        </div>
+      </div>
+      
+      <div className="auth-form-section">
+        <div className="auth-form-container fade-in">
+          <div className="auth-form-header">
+            <h2>{isRegister ? 'Create an Account' : 'Welcome Back'}</h2>
+            <p>{isRegister ? 'Sign up to get started with SwasthyaAI.' : 'Please enter your details to sign in.'}</p>
+          </div>
 
-        {isRegister && (
-          <>
-            <div>
-              <label style={{ display: 'block', marginBottom: '4px', fontSize: '13px', fontWeight: '600' }}>Full Name *</label>
+          {error && (
+            <div className="auth-error-message">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+              <span>{error}</span>
+            </div>
+          )}
+
+          <form className="auth-form" onSubmit={handleSubmit}>
+            {isRegister && (
+              <div className="auth-input-group-row">
+                <div className="auth-input-group">
+                  <label>Full Name</label>
+                  <input 
+                    type="text" 
+                    className="auth-input" 
+                    required
+                    value={name} onChange={e => setName(e.target.value)}
+                    placeholder="John Doe"
+                  />
+                </div>
+                <div className="auth-input-group">
+                  <label>Phone Number <span>(For Reminders)</span></label>
+                  <input 
+                    type="tel" 
+                    className="auth-input" 
+                    required
+                    value={phone} onChange={e => setPhone(e.target.value)}
+                    placeholder="+91 98765 43210"
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className="auth-input-group">
+              <label>Email Address</label>
               <input 
-                type="text" 
-                className="input-field" 
+                type="email" 
+                className="auth-input" 
                 required
-                style={{ width: '100%', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 14px' }}
-                value={name} onChange={e => setName(e.target.value)}
-                placeholder="John Doe"
+                value={email} onChange={e => setEmail(e.target.value)}
+                placeholder="you@example.com"
               />
             </div>
-            <div>
-              <label style={{ display: 'block', marginBottom: '4px', fontSize: '13px', fontWeight: '600' }}>Phone Number * <span style={{color:'#6b7280', fontWeight: 'normal'}}>(Required for Reminders)</span></label>
+
+            <div className="auth-input-group">
+              <label>Password</label>
               <input 
-                type="tel" 
-                className="input-field" 
+                type="password" 
+                className="auth-input" 
                 required
-                style={{ width: '100%', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 14px' }}
-                value={phone} onChange={e => setPhone(e.target.value)}
-                placeholder="+91 98765 43210"
+                value={password} onChange={e => setPassword(e.target.value)}
+                placeholder="••••••••"
               />
             </div>
-          </>
-        )}
 
-        <div>
-          <label style={{ display: 'block', marginBottom: '4px', fontSize: '13px', fontWeight: '600' }}>Email Address *</label>
-          <input 
-            type="email" 
-            className="input-field" 
-            required
-            style={{ width: '100%', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 14px' }}
-            value={email} onChange={e => setEmail(e.target.value)}
-            placeholder="you@example.com"
-          />
+            <button type="submit" className="auth-submit-btn" disabled={loading}>
+              {loading ? (
+                 <span className="auth-spinner"></span>
+              ) : (isRegister ? 'Sign Up' : 'Sign In')}
+            </button>
+          </form>
+
+          <p className="auth-toggle-text">
+            {isRegister ? "Already have an account? " : "Don't have an account? "}
+            <button 
+              type="button"
+              className="auth-toggle-btn"
+              onClick={() => { setIsRegister(!isRegister); setError(''); }}
+            >
+              {isRegister ? "Sign In" : "Create one"}
+            </button>
+          </p>
         </div>
-
-        <div>
-          <label style={{ display: 'block', marginBottom: '4px', fontSize: '13px', fontWeight: '600' }}>Password *</label>
-          <input 
-            type="password" 
-            className="input-field" 
-            required
-            style={{ width: '100%', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 14px' }}
-            value={password} onChange={e => setPassword(e.target.value)}
-            placeholder="••••••••"
-          />
-        </div>
-
-        <button type="submit" className="upcoming-btn" disabled={loading} style={{ marginTop: '8px' }}>
-          {loading ? 'Please wait...' : (isRegister ? 'Sign Up' : 'Sign In')}
-        </button>
-
-        <p style={{ textAlign: 'center', fontSize: '13px', color: 'var(--text-muted)', marginTop: '8px' }}>
-          {isRegister ? "Already have an account? " : "Don't have an account? "}
-          <span 
-            style={{ color: 'var(--accent-blue)', cursor: 'pointer', fontWeight: '600' }}
-            onClick={() => { setIsRegister(!isRegister); setError(''); }}
-          >
-            {isRegister ? "Sign In" : "Sign Up"}
-          </span>
-        </p>
-      </form>
+      </div>
     </div>
   )
 }
