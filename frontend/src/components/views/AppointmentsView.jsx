@@ -40,7 +40,9 @@ export default function AppointmentsView({ patientName, onNewBooking, userPhone 
 
   const [reminderDoctor, setReminderDoctor] = useState('');
   const [reminderDate, setReminderDate] = useState('');
-  const [reminderTime, setReminderTime] = useState('');
+  const [reminderHour, setReminderHour] = useState('10');
+  const [reminderMinute, setReminderMinute] = useState('00');
+  const [reminderPeriod, setReminderPeriod] = useState('AM');
   const [reminderDelay, setReminderDelay] = useState('1');
   const [showToast, setShowToast] = useState(false);
   const [toastMsg, setToastMsg] = useState('');
@@ -51,7 +53,8 @@ export default function AppointmentsView({ patientName, onNewBooking, userPhone 
   const [docSearch, setDocSearch] = useState('');
 
   const handleSetReminder = async () => {
-    if (!reminderDoctor || !reminderDate || !reminderTime) return;
+    const combinedTime = `${reminderHour}:${reminderMinute} ${reminderPeriod}`;
+    if (!reminderDoctor || !reminderDate || !combinedTime) return;
     const phone = userPhone || phoneOverride;
     if (!phone) {
       setReminderError('Please enter your phone number to receive the call.');
@@ -65,7 +68,7 @@ export default function AppointmentsView({ patientName, onNewBooking, userPhone 
         patient_name: patientName,
         doctor: reminderDoctor,
         date: reminderDate,
-        time: reminderTime,
+        time: combinedTime,
         delay_minutes: parseInt(reminderDelay) || 1,
         language: 'English',
       });
@@ -75,7 +78,9 @@ export default function AppointmentsView({ patientName, onNewBooking, userPhone 
       setReminderDoctor('');
       setDocSearch('');
       setReminderDate('');
-      setReminderTime('');
+      setReminderHour('10');
+      setReminderMinute('00');
+      setReminderPeriod('AM');
       setReminderDelay('1');
       setPhoneOverride('');
     } catch (err) {
@@ -277,12 +282,34 @@ export default function AppointmentsView({ patientName, onNewBooking, userPhone 
                 </div>
                 <div>
                   <label style={{ fontSize: '11px', fontWeight: '600', color: '#64748b', marginBottom: '6px', display: 'block', textTransform: 'uppercase' }}>Time</label>
-                  <input
-                    type="time"
-                    value={reminderTime}
-                    onChange={e => setReminderTime(e.target.value)}
-                    style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #e2e8f0', background: '#f8fafc', fontSize: '13px', color: '#1e293b', outline: 'none' }}
-                  />
+                  <div style={{ display: 'flex', gap: '4px' }}>
+                    <select
+                      value={reminderHour}
+                      onChange={e => setReminderHour(e.target.value)}
+                      style={{ flex: 1, padding: '10px 4px', borderRadius: '8px', border: '1px solid #e2e8f0', background: '#f8fafc', fontSize: '12px', color: '#1e293b', outline: 'none', cursor: 'pointer' }}
+                    >
+                      {Array.from({length: 12}).map((_, i) => (
+                        <option key={i+1} value={String(i+1).padStart(2, '0')}>{i+1}</option>
+                      ))}
+                    </select>
+                    <select
+                      value={reminderMinute}
+                      onChange={e => setReminderMinute(e.target.value)}
+                      style={{ flex: 1, padding: '10px 4px', borderRadius: '8px', border: '1px solid #e2e8f0', background: '#f8fafc', fontSize: '12px', color: '#1e293b', outline: 'none', cursor: 'pointer' }}
+                    >
+                      {['00', '15', '30', '45'].map(m => (
+                        <option key={m} value={m}>{m}</option>
+                      ))}
+                    </select>
+                    <select
+                      value={reminderPeriod}
+                      onChange={e => setReminderPeriod(e.target.value)}
+                      style={{ flex: 1, padding: '10px 4px', borderRadius: '8px', border: '1px solid #e2e8f0', background: '#f8fafc', fontSize: '12px', color: '#1e293b', outline: 'none', cursor: 'pointer' }}
+                    >
+                      <option value="AM">AM</option>
+                      <option value="PM">PM</option>
+                    </select>
+                  </div>
                 </div>
               </div>
 
@@ -332,17 +359,17 @@ export default function AppointmentsView({ patientName, onNewBooking, userPhone 
               {/* Set Reminder Button */}
               <button
                 onClick={handleSetReminder}
-                disabled={reminderLoading || !reminderDoctor || !reminderDate || !reminderTime}
+                disabled={reminderLoading || !reminderDoctor || !reminderDate}
                 style={{
                   width: '100%',
                   padding: '12px',
                   borderRadius: '8px',
                   border: 'none',
-                  background: (reminderLoading || !reminderDoctor || !reminderDate || !reminderTime) ? '#e2e8f0' : '#3b82f6',
-                  color: (reminderLoading || !reminderDoctor || !reminderDate || !reminderTime) ? '#94a3b8' : 'white',
+                  background: (reminderLoading || !reminderDoctor || !reminderDate) ? '#e2e8f0' : '#3b82f6',
+                  color: (reminderLoading || !reminderDoctor || !reminderDate) ? '#94a3b8' : 'white',
                   fontSize: '13px',
                   fontWeight: '600',
-                  cursor: (reminderLoading || !reminderDoctor || !reminderDate || !reminderTime) ? 'not-allowed' : 'pointer',
+                  cursor: (reminderLoading || !reminderDoctor || !reminderDate) ? 'not-allowed' : 'pointer',
                   transition: 'all 0.2s'
                 }}
               >
