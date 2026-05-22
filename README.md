@@ -1,285 +1,154 @@
-# 🏥 SwasthyaAI — Real-Time Multilingual AI Voice Assistant
+# SwasthyaAI: Enterprise Multilingual Voice AI Agent
 
-A full-stack, production-grade AI voice assistant for healthcare clinics.
-Manages appointment booking, rescheduling, and cancellation through natural conversation
-in **English**, **Hindi**, and **Tamil** — via voice or text.
+Production-grade, low-latency conversational AI agent orchestrating real-time healthcare scheduling, voice-to-text processing, and outbound reminders across English, Hindi, and Tamil.
 
 ---
 
-## 🧱 Tech Stack
+## 1. System Architecture & Components
 
-| Layer | Technology |
-|---|---|
-| **Frontend** | React + Vite (WebRTC voice capture) |
-| **Backend** | FastAPI (Python 3.11+) |
-| **LLM** | Groq API — LLaMA 3 70B |
-| **STT** | faster-whisper (base model, CPU) |
-| **TTS** | Azure Cognitive Services Neural TTS |
-| **Database** | SQLite via SQLAlchemy ORM |
-| **Outbound Calls** | Exotel Click-to-Call API |
+```
+User Input ──[WebRTC]──> Speech-to-Text ──> LLM Agent Orchestrator ──> Tool Call (SQL Lock) ──> Text-to-Speech ──> Client Playback
+```
 
----
+### Core Architecture
+- **Voice Pipeline**: Real-time WebRTC audio streaming to FastAPI backend.
+- **Transcription**: `faster-whisper` (base) executing on local device CPU/GPU.
+- **Orchestration**: LLaMA-3-70B via Groq API utilizing strict function calling constraints.
+- **Synthesis**: Azure Cognitive Services Neural Text-to-Speech.
+- **Data Store**: SQLite with SQLAlchemy ORM (enforcing transactional serialization).
+- **Outbound Channel**: Exotel Click-to-Call API with webhook digit extraction.
 
-## 📁 Project Structure
-
+### Repository Layout
 ```
 ├── backend/
-│   ├── main.py                    # FastAPI entry point
-│   ├── config.py                  # Clinic config + settings
-│   ├── requirements.txt
-│   ├── .env.example
+│   ├── main.py                    # API Entrypoint
+│   ├── config.py                  # Environment Constraints
+│   ├── requirements.txt           # Dependency Manifest
+│   ├── .env.example               # Template
 │   ├── database/
-│   │   ├── database.py            # SQLAlchemy engine
-│   │   └── models.py              # ORM models
+│   │   ├── database.py            # Transaction Engine
+│   │   └── models.py              # Schema Models
 │   ├── tools/
-│   │   └── appointment_tools.py   # Tool executors (CRUD + validation)
-│   ├── services/
-│   │   ├── llm_service.py         # Groq LLaMA-3 agent loop
-│   │   ├── stt_service.py         # Whisper transcription
-│   │   ├── tts_service.py         # Azure TTS (gTTS fallback)
-│   │   ├── memory_service.py      # Session + patient memory
-│   │   └── exotel_service.py      # Outbound call API
-│   └── routers/
-│       ├── chat.py                # POST /api/chat
-│       ├── voice.py               # POST /api/voice/stt|tts
-│       ├── appointments.py        # CRUD /api/appointments
-│       └── outbound.py            # /api/outbound/*
-│
+│   │   └── appointment_tools.py   # CRUD Actions & Lock Enforcement
+│   └── services/
+│       ├── llm_service.py         # Groq LLM Agent Control Loop
+│       ├── stt_service.py         # Whisper Transcription Service
+│       ├── tts_service.py         # Azure TTS Synthesis Engine
+│       ├── memory_service.py      # Session Cache & Patient Registry
+│       └── exotel_service.py      # Telephony Integration
 └── frontend/
-    ├── index.html
-    ├── vite.config.js
-    ├── package.json
-    └── src/
-        ├── App.jsx                # Root component + layout
-        ├── main.jsx
-        ├── styles/index.css       # Dark glassmorphism design system
-        ├── hooks/useWebRTC.js     # Mic capture + waveform analyser
-        ├── services/api.js        # Axios API client
-        └── components/
-            ├── ChatWindow.jsx     # Conversation bubbles
-            ├── VoiceInterface.jsx # Mic + waveform + text input
-            ├── StatusBar.jsx      # Listening/Thinking/Speaking
-            ├── DoctorPanel.jsx    # Doctor cards + availability
-            ├── AppointmentCard.jsx# Upcoming appointments
-            └── OutboundPanel.jsx  # Reminder simulation
+    ├── src/
+    │   ├── App.jsx                # Layout Core
+    │   ├── styles/index.css       # CSS Design Token System
+    │   ├── hooks/useWebRTC.js     # Media Capture & Stream Analyser
+    │   └── services/api.js        # API Client Wrapper
 ```
 
 ---
 
-## 🐳 Docker Quick Start (Recommended)
+## 2. Infrastructure Setup & Deployment
 
-The easiest way to run the full stack — **no Python/Node setup required**.
+### Quick Start via Docker Compose (Recommended)
+This runs the isolated stack with persistent volume storage.
 
-### Prerequisites
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/) installed and running.
+1. **Clone Repository**
+   ```bash
+   git clone https://github.com/pandeyadarsh2503/Real-Time-Multilingual-Voice-AI-Agent.git
+   cd Real-Time-Multilingual-Voice-AI-Agent
+   ```
 
-### Steps
+2. **Configure Environment**
+   ```bash
+   copy backend\.env.example backend\.env
+   ```
+   *Required variables within `backend/.env`:*
+   - `GROQ_API_KEY`: Groq Console API Token
+   - `AZURE_TTS_KEY`: Azure Cognitive Speech Access Key
+   - `AZURE_TTS_REGION`: Location region (e.g. `eastus`)
+   - `EXOTEL_API_KEY` / `EXOTEL_API_TOKEN` / `EXOTEL_SID` / `EXOTEL_CALLER_ID`: Exotel Telephony Credentials
 
-```bash
-# 1. Clone the repo
-git clone https://github.com/pandeyadarsh2503/Real-Time-Multilingual-Voice-AI-Agent.git
-cd Real-Time-Multilingual-Voice-AI-Agent
-
-# 2. Create your environment file with API keys
-copy backend\.env.example backend\.env
-# Then open backend\.env and fill in: GROQ_API_KEY, AZURE_TTS_KEY, etc.
-
-# 3. Build and start both services
-docker compose up --build
-```
-
-| Service | URL |
-|---|---|
-| **Frontend** (React app) | http://localhost:5173 |
-| **Backend API docs** | http://localhost:8000/docs |
-
-> **Stopping:** `docker compose down`  
-> **Database** is persisted in a Docker named volume (`db_data`) — your data survives restarts.
+3. **Deploy Containerized Stack**
+   ```bash
+   docker compose up --build
+   ```
+   *Access URLs:*
+   - **Frontend UI**: `http://localhost:5173`
+   - **API Specs**: `http://localhost:8000/docs`
 
 ---
 
-## ⚡ Quick Start (Local / Manual)
+## 3. Manual Local Installation
 
-### 1. Backend Setup
-
+### Backend Setup
 ```bash
 cd backend
-
-# Create virtual environment
 python -m venv venv
-venv\Scripts\activate          # Windows
-# source venv/bin/activate     # Linux/Mac
+# Windows:
+venv\Scripts\activate
+# Linux/Mac:
+source venv/bin/activate
 
-# Install dependencies
 pip install -r requirements.txt
-
-# Configure environment
 copy .env.example .env
-# Edit .env and fill in your API keys:
-#   GROQ_API_KEY, AZURE_TTS_KEY, AZURE_TTS_REGION
-#   EXOTEL_API_KEY, EXOTEL_API_TOKEN, EXOTEL_SID, EXOTEL_CALLER_ID
-
-# Start server
 uvicorn main:app --reload --port 8000
 ```
 
-API docs available at: http://localhost:8000/docs
-
-### 2. Frontend Setup
-
+### Frontend Setup
 ```bash
 cd frontend
-
 npm install
 npm run dev
 ```
 
-App available at: http://localhost:5173
-
 ---
 
-## 🔑 Environment Variables
-
-| Variable | Description |
-|---|---|
-| `GROQ_API_KEY` | Groq API key (get from console.groq.com) |
-| `AZURE_TTS_KEY` | Azure Speech Services key |
-| `AZURE_TTS_REGION` | Azure region (e.g. `eastus`) |
-| `EXOTEL_API_KEY` | Exotel API key |
-| `EXOTEL_API_TOKEN` | Exotel API token |
-| `EXOTEL_SID` | Exotel Account SID |
-| `EXOTEL_CALLER_ID` | Your Exotel virtual number |
-| `DATABASE_URL` | SQLite URL (default: `sqlite:///./swasthya.db`) |
-
----
-
-## 🏥 Clinic Configuration
-
-Edit `backend/config.py` to change:
-- Doctor list and specialties
-- Working hours and slot duration
-- Azure voice names per language
-- Whisper model size
-
----
-
-## 🎯 Features
-
-### Voice Pipeline
-```
-🎤 Mic (WebRTC) → FastAPI → Whisper STT → Groq LLaMA-3 → Azure TTS → 🔊 Speaker
-```
-
-### Appointment Management
-- ✅ Book appointments (with conflict detection)
-- 🔄 Reschedule appointments
-- ✕ Cancel appointments
-- 📅 Check doctor availability
-- ⏰ Validate working hours + no past-time booking
-
-### Multilingual Support
-- 🇬🇧 English — `en-IN-NeerjaNeural`
-- 🇮🇳 Hindi — `hi-IN-SwaraNeural`
-- 🇮🇳 Tamil — `ta-IN-PallaviNeural`
-- Auto-detection from voice (Whisper) and text (Unicode heuristic)
-
-### Outbound Reminders
-- Exotel Click-to-Call for patient reminders
-- Simulation mode for testing without live calls
-- Webhook handler for DTMF digit responses (1=confirm, 2=reschedule, 3=cancel)
-
----
-
-## 📡 API Reference
+## 4. API Endpoints
 
 | Method | Endpoint | Description |
 |---|---|---|
-| POST | `/api/chat` | Send text message, get AI response |
-| POST | `/api/voice/stt` | Upload audio → transcript |
-| POST | `/api/voice/tts` | Text → MP3 audio |
-| GET | `/api/appointments` | List appointments |
-| GET | `/api/appointments/today` | Today grouped by doctor |
-| GET | `/api/appointments/upcoming` | Next N appointments |
-| GET | `/api/appointments/{id}` | Single appointment |
-| DELETE | `/api/appointments/{id}` | Cancel appointment |
-| POST | `/api/outbound/trigger` | Trigger Exotel call |
-| POST | `/api/outbound/simulate` | Simulate reminder (no call) |
-| POST | `/api/outbound/webhook` | Exotel webhook callback |
-| GET | `/api/outbound/upcoming-reminders` | Tomorrow's appointments |
+| `POST` | `/api/chat` | Receives raw user text; returns agent text response. |
+| `POST` | `/api/voice/stt` | Uploads WebM audio stream; returns text transcription. |
+| `POST` | `/api/voice/tts` | Converts text string to MP3 audio stream. |
+| `GET` | `/api/appointments` | Lists entire database booking registry. |
+| `GET` | `/api/appointments/today` | Active bookings for current date grouped by practitioner. |
+| `GET` | `/api/appointments/upcoming` | Retrieve next `N` chronologically sorted bookings. |
+| `DELETE` | `/api/appointments/{id}` | Immediate hard cancellation of targeted slot. |
+| `POST` | `/api/outbound/trigger` | Triggers live Exotel outbound reminder call. |
+| `POST` | `/api/outbound/simulate` | Triggers simulated outbound reminder. |
+| `POST` | `/api/outbound/webhook` | Listens to Exotel caller DTMF input responses. |
 
 ---
 
-## 🧠 LLM Agent Flow
+## 5. Strict Clinic Constraints
 
-```
-User Input
-    ↓
-Groq LLaMA-3 (with 4 tool definitions)
-    ↓
-Tool Call? ──YES──→ Execute Tool (SQLite) → Return Result → LLaMA-3 again
-    ↓ NO
-Final Text Response
-    ↓
-Azure TTS → MP3 → Browser Audio
-```
+The agent strictly enforces these rules programmatically:
+- **Operation Hours**: `09:00` to `17:00` (in `30`-minute interval slots).
+- **Concurrency Prevention**: SQLite unique constraints `uq_scheduled_slot` on `(doctor, date, time, status)` combined with SQLAlchemy `.with_for_update()` SELECT locks.
+- **Temporal Enforcement**: No historic date booking; no historic time booking for the current day.
+- **Implicit Rules**: Suggests up to 3 fallback slots in case of conflicts; booking requires explicit patient confirmation.
 
 ---
 
-## 🔧 Customisation
+## 6. Development & Customization
 
-### Add a new doctor
-In `backend/config.py`:
+All configurations reside in [config.py](file:///c:/Users/pande/OneDrive/Desktop/Real%20Time%20Voice%20Multilingual%20AI%20agent/backend/config.py):
+
+### Registering Practitioners
 ```python
-DOCTORS.append({"name": "Dr Patel", "specialty": "Orthopedist", "icon": "🦴", "color": "#10b981"})
+DOCTORS.append({
+    "name": "Dr Patel",
+    "specialty": "Orthopedist",
+    "icon": "🦴",
+    "color": "#10b981"
+})
 ```
 
-### Change Whisper model
-In `backend/config.py`:
+### Custom Speech Model Size
 ```python
-WHISPER_MODEL = "medium"   # better accuracy, slower
+WHISPER_MODEL = "medium" # CPU memory required: ~1.5 GB
 ```
 
-### Add language support
-In `backend/config.py`:
+### Adding Voice Synthesis Locale
 ```python
-AZURE_VOICES["te"] = "te-IN-MohanNeural"  # Telugu
-```
-
----
-
-## 📋 Clinic Rules (Enforced)
-
-- Working hours: 09:00 – 17:00 (slots every 30 min)
-- No double booking (same doctor + date + time)
-- No past-date bookings
-- No past-time bookings for today
-- Confirmation required before any booking
-- Up to 3 alternative slots suggested on conflict
-
----
-
-## 🌐 Browser Support
-
-| Browser | Voice Input | TTS Playback |
-|---|---|---|
-| Chrome | ✅ | ✅ |
-| Edge | ✅ | ✅ |
-| Firefox | ⚠️ (limited MediaRecorder) | ✅ |
-| Safari | ✅ (iOS 14.5+) | ✅ |
-
-> **Note:** Text input works in all browsers. Voice input requires HTTPS in production.
-
----
-
-## 📦 Dependencies
-
-### Backend
-```
-fastapi, uvicorn, groq, faster-whisper, azure-cognitiveservices-speech,
-sqlalchemy, requests, python-multipart, pydantic-settings
-```
-
-### Frontend
-```
-react, react-dom, axios, uuid, react-icons, react-hot-toast
+AZURE_VOICES["te"] = "te-IN-MohanNeural"
 ```
