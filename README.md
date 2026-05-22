@@ -66,7 +66,39 @@ in **English**, **Hindi**, and **Tamil** — via voice or text.
 
 ---
 
-## ⚡ Quick Start
+## 🐳 Docker Quick Start (Recommended)
+
+The easiest way to run the full stack — **no Python/Node setup required**.
+
+### Prerequisites
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) installed and running.
+
+### Steps
+
+```bash
+# 1. Clone the repo
+git clone https://github.com/pandeyadarsh2503/Real-Time-Multilingual-Voice-AI-Agent.git
+cd Real-Time-Multilingual-Voice-AI-Agent
+
+# 2. Create your environment file with API keys
+copy backend\.env.example backend\.env
+# Then open backend\.env and fill in: GROQ_API_KEY, AZURE_TTS_KEY, etc.
+
+# 3. Build and start both services
+docker compose up --build
+```
+
+| Service | URL |
+|---|---|
+| **Frontend** (React app) | http://localhost:5173 |
+| **Backend API docs** | http://localhost:8000/docs |
+
+> **Stopping:** `docker compose down`  
+> **Database** is persisted in a Docker named volume (`db_data`) — your data survives restarts.
+
+---
+
+## ⚡ Quick Start (Local / Manual)
 
 ### 1. Backend Setup
 

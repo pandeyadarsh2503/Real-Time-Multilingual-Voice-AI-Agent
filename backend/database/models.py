@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey
+from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey, UniqueConstraint
 from sqlalchemy.sql import func
 from .database import Base
 
@@ -18,6 +18,18 @@ class Appointment(Base):
     time         = Column(String, nullable=False)   # HH:MM (24h)
     status       = Column(String, default="scheduled")  # scheduled | cancelled | completed
     created_at   = Column(DateTime, server_default=func.now())
+
+    # ── Race-condition guard ───────────────────────────────
+    # Enforces at the DB layer that no two *scheduled* appointments
+    # can exist for the same doctor + date + time combination.
+    # This prevents double-booking even if two concurrent requests
+    # both pass the application-level availability check.
+    __table_args__ = (
+        UniqueConstraint(
+            "doctor", "date", "time", "status",
+            name="uq_scheduled_slot",
+        ),
+    )
 
 
 class Patient(Base):

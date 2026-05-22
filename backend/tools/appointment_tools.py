@@ -1,6 +1,7 @@
 from datetime import datetime, date
 from typing import Optional
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 from database.models import Appointment
 from config import TIME_SLOTS, DOCTOR_NAMES
 import uuid
@@ -69,12 +70,17 @@ def book_appointment(name: str, doctor: str, date_str: str, time_str: str, db: S
         if slot_dt <= datetime.now():
             return {"error": "This time slot has already passed for today."}
 
+    # ── Pessimistic lock: SELECT ... FOR UPDATE ───────────────
+    # Locks the matching row(s) so a concurrent transaction that has
+    # already found this slot 'free' cannot commit until we finish.
+    # On SQLite this gracefully degrades to a standard SELECT because
+    # SQLite serialises writes at the file level.
     conflict = db.query(Appointment).filter(
         Appointment.doctor == doctor,
         Appointment.date   == date_str,
         Appointment.time   == time_str,
         Appointment.status == "scheduled",
-    ).first()
+    ).with_for_update().first()
 
     if conflict:
         avail = check_availability(doctor, date_str, db)
@@ -93,9 +99,22 @@ def book_appointment(name: str, doctor: str, date_str: str, time_str: str, db: S
         time=time_str,
         status="scheduled",
     )
-    db.add(appt)
-    db.commit()
-    db.refresh(appt)
+    try:
+        db.add(appt)
+        db.commit()
+        db.refresh(appt)
+    except IntegrityError:
+        # ── Second-layer defence ───────────────────────────────
+        # Triggered when two concurrent requests both passed the lock
+        # check (possible on SQLite which lacks true row-level locking)
+        # and the DB UniqueConstraint fires on the second INSERT.
+        db.rollback()
+        avail = check_availability(doctor, date_str, db)
+        suggested = avail.get("available_slots", [])[:3]
+        return {
+            "error": f"Slot {time_str} was just booked by another request. Please choose a different time.",
+            "suggested_slots": suggested,
+        }
 
     return {
         "success": True,
@@ -135,13 +154,14 @@ def reschedule_appointment(appointment_id: str, new_date: str, new_time: str, db
         if slot_dt <= datetime.now():
             return {"error": "This time slot has already passed for today."}
 
+    # ── Pessimistic lock: SELECT ... FOR UPDATE ───────────────
     conflict = db.query(Appointment).filter(
         Appointment.doctor == appt.doctor,
         Appointment.date   == new_date,
         Appointment.time   == new_time,
         Appointment.status == "scheduled",
         Appointment.id     != appointment_id,
-    ).first()
+    ).with_for_update().first()
 
     if conflict:
         avail = check_availability(appt.doctor, new_date, db)
@@ -154,7 +174,16 @@ def reschedule_appointment(appointment_id: str, new_date: str, new_time: str, db
     old_date, old_time = appt.date, appt.time
     appt.date = new_date
     appt.time = new_time
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        avail = check_availability(appt.doctor, new_date, db)
+        suggested = avail.get("available_slots", [])[:3]
+        return {
+            "error": f"Slot {new_time} on {new_date} was just taken. Please pick another time.",
+            "suggested_slots": suggested,
+        }
 
     return {
         "success": True,
