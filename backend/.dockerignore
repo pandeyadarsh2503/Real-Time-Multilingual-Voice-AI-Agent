@@ -1,21 +1,17 @@
-# Python cache
 __pycache__/
 *.py[cod]
 *.pyo
 *.pyd
 .Python
 
-# Virtual environments
 venv/
 env/
 .venv/
 .env/
 
-# SQLite DB (written at runtime into the Docker volume)
 *.db
 *.sqlite3
 
-# Test / coverage files
 .pytest_cache/
 htmlcov/
 .coverage
@@ -23,7 +19,6 @@ htmlcov/
 dist/
 build/
 
-# IDE / OS files
 .idea/
 .vscode/
 *.swp
@@ -31,14 +26,11 @@ build/
 .DS_Store
 Thumbs.db
 
-# Git
 .git/
 .gitignore
 
-# Docker files (no need to copy into image)
 Dockerfile
 .dockerignore
 
-# Logs
 *.log
 logs/

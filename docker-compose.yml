@@ -1,42 +1,21 @@
-# ──────────────────────────────────────────────────────────────────────────────
-# SwasthyaAI — Docker Compose
-#
-# HOW TO USE:
-#   1. Copy backend/.env.example → backend/.env  and fill in your API keys.
-#   2. Run:  docker compose up --build
-#   3. Open: http://localhost:5173  (frontend)
-#            http://localhost:8000/docs (backend API docs)
-# ──────────────────────────────────────────────────────────────────────────────
-
 version: "3.9"
 
 services:
 
-  # ── FastAPI Backend ──────────────────────────────────────────────────────────
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
     container_name: swasthyaai-backend
     restart: unless-stopped
-
-    # Load all API keys and settings from backend/.env
-    # Create this file by copying backend/.env.example and filling in values.
     env_file:
       - ./backend/.env
-
-    # Override the database path to write inside the named volume so data
-    # survives container restarts and rebuilds.
     environment:
       - DATABASE_URL=sqlite:////data/swasthya.db
-
     ports:
       - "8000:8000"
-
     volumes:
-      # Persist SQLite database across container restarts
       - db_data:/data
-
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 30s
@@ -44,26 +23,20 @@ services:
       retries: 5
       start_period: 30s
 
-  # ── React / Nginx Frontend ───────────────────────────────────────────────────
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        # The browser talks to /api/* which Nginx reverse-proxies to the backend
-        # container; no VITE_API_URL override is needed for compose.
         VITE_API_URL: ""
     container_name: swasthyaai-frontend
     restart: unless-stopped
-
     ports:
       - "5173:80"
-
     depends_on:
       backend:
         condition: service_healthy
 
-# ── Named volumes ────────────────────────────────────────────────────────────
 volumes:
   db_data:
     driver: local

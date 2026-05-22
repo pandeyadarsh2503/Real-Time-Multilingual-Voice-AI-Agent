@@ -1,10 +1,7 @@
-# Node dependencies (re-installed during build)
 node_modules/
 
-# Vite build output (built during Docker build)
 dist/
 
-# IDE / OS files
 .idea/
 .vscode/
 *.swp
@@ -12,15 +9,11 @@ dist/
 .DS_Store
 Thumbs.db
 
-# Git
 .git/
 .gitignore
 
-# Docker files
 Dockerfile
 .dockerignore
-nginx.conf
 
-# Logs
 *.log
 npm-debug.log*
