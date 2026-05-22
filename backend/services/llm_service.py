@@ -50,7 +50,7 @@ Return ONLY the spoken message text. No JSON. No extra explanation.
 
 # ── System Prompt ──────────────────────────────────────────
 SYSTEM_PROMPT = """\
-You are ClinicAI — a real-time multilingual AI voice assistant for a healthcare clinic.
+You are SwasthyaAI — a real-time multilingual AI voice assistant for a healthcare clinic.
 You communicate naturally in English, Hindi, and Tamil.
 
 ━━ LANGUAGE RULES ━━

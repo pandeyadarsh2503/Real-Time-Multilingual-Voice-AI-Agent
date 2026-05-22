@@ -27,7 +27,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Healthcare Clinic AI Voice Assistant",
+    title="SwasthyaAI — Healthcare Voice Assistant",
     description=(
         "Real-time multilingual AI voice assistant for clinic appointment management. "
         "Supports English, Hindi, and Tamil."
@@ -59,7 +59,7 @@ app.include_router(outbound.router,     prefix="/api", tags=["Outbound"])
 @app.get("/", tags=["Health"])
 def root():
     return {
-        "service": "Healthcare Clinic AI Voice Assistant",
+        "service": "SwasthyaAI — Healthcare Voice Assistant",
         "status":  "running",
         "docs":    "/docs",
     }

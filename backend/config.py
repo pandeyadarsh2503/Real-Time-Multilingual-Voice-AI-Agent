@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     EXOTEL_API_TOKEN: str = ""
     EXOTEL_SID: str = ""
     EXOTEL_CALLER_ID: str = ""
-    DATABASE_URL: str = "sqlite:///./clinic.db"
+    DATABASE_URL: str = "sqlite:///./swasthya.db"
     TTS_PROVIDER: str = "azure"
 
     class Config:

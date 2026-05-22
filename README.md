@@ -1,4 +1,4 @@
-# 🏥 ClinicAI — Real-Time Multilingual AI Voice Assistant
+# 🏥 SwasthyaAI — Real-Time Multilingual AI Voice Assistant
 
 A full-stack, production-grade AI voice assistant for healthcare clinics.
 Manages appointment booking, rescheduling, and cancellation through natural conversation
@@ -117,7 +117,7 @@ App available at: http://localhost:5173
 | `EXOTEL_API_TOKEN` | Exotel API token |
 | `EXOTEL_SID` | Exotel Account SID |
 | `EXOTEL_CALLER_ID` | Your Exotel virtual number |
-| `DATABASE_URL` | SQLite URL (default: `sqlite:///./clinic.db`) |
+| `DATABASE_URL` | SQLite URL (default: `sqlite:///./swasthya.db`) |
 
 ---
 
