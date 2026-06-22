@@ -1,4 +1,4 @@
-# SwasthyaAI: Enterprise Multilingual Voice AI Agent
+# SwasthyaAI: AI-Powered Multilingual Healthcare Assistant & Appointment Booking System
 
 Production-grade, low-latency conversational AI agent orchestrating real-time healthcare scheduling, voice-to-text processing, and outbound reminders across English, Hindi, and Tamil.
 
