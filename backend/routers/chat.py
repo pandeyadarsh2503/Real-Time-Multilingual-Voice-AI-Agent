@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field
 from typing import Optional
 import logging
 
+from core.metrics import CHAT_TURNS
 from core.rate_limit import limiter
 from database.database import get_db
 from services.auth_service import get_current_user
@@ -122,6 +123,7 @@ async def chat(
         # 7. Persist assistant reply
         persist_text(session_key, "assistant", response_text, db)
 
+        CHAT_TURNS.labels(outcome="ok").inc()
         return ChatResponse(
             response=response_text,
             session_id=req.session_id,
@@ -129,6 +131,7 @@ async def chat(
         )
 
     except Exception:
+        CHAT_TURNS.labels(outcome="error").inc()
         logger.exception("Chat error")
         raise HTTPException(
             status_code=500,

@@ -1,22 +1,25 @@
+import json
 import logging
+import time
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request
+
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
+from prometheus_fastapi_instrumentator import Instrumentator
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
+from sqlalchemy import text
 
 from config import settings
+from core.logging_config import setup_logging
 from core.rate_limit import limiter
+from core.request_context import RequestIdMiddleware
+from core.tracing import init_tracing
 from database.database import run_startup_migrations
-from routers import chat, voice, appointments, outbound
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s — %(message)s",
-)
-logging.getLogger("httpx").setLevel(logging.WARNING)
-
+setup_logging(settings.LOG_FORMAT)
 logger = logging.getLogger(__name__)
 
 
@@ -53,7 +56,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# ── Rate limiting (in-process, per client IP) ──────────────
+# ── Rate limiting (Redis-backed when configured) ───────────
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
@@ -67,11 +70,29 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+_QUIET_PATHS = ("/health", "/health/ready", "/metrics")
+access_logger = logging.getLogger("access")
 
-# ── Security headers ───────────────────────────────────────
+
+# ── Access log + security headers ──────────────────────────
 @app.middleware("http")
-async def security_headers(request: Request, call_next):
+async def access_log_and_security_headers(request: Request, call_next):
+    start = time.perf_counter()
     response = await call_next(request)
+    duration_ms = round((time.perf_counter() - start) * 1000, 1)
+
+    if request.url.path not in _QUIET_PATHS:
+        access_logger.info(
+            f"{request.method} {request.url.path} → {response.status_code} ({duration_ms}ms)",
+            extra={
+                "method": request.method,
+                "path": request.url.path,
+                "status_code": response.status_code,
+                "duration_ms": duration_ms,
+                "client_ip": request.client.host if request.client else "-",
+            },
+        )
+
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     response.headers.setdefault("X-Frame-Options", "DENY")
     response.headers.setdefault("Referrer-Policy", "no-referrer")
@@ -81,7 +102,18 @@ async def security_headers(request: Request, call_next):
     return response
 
 
+# Outermost middleware: everything inside sees the request ID.
+app.add_middleware(RequestIdMiddleware)
+
+# ── HTTP metrics (per-handler latency histograms) ──────────
+Instrumentator(excluded_handlers=["/metrics", "/health.*"]).instrument(app)
+
+# ── Tracing (no-op unless OTLP endpoint configured) ────────
+init_tracing(app)
+
 # ── Routers ────────────────────────────────────────────────
+from routers import chat, voice, appointments, outbound  # noqa: E402
+
 app.include_router(chat.router,         prefix="/api", tags=["Chat"])
 app.include_router(voice.router,        prefix="/api", tags=["Voice"])
 app.include_router(appointments.router, prefix="/api", tags=["Appointments"])
@@ -99,4 +131,51 @@ def root():
 
 @app.get("/health", tags=["Health"])
 def health():
+    """Liveness: the process is up. No dependency checks — a wedged
+    dependency must not get the container restarted."""
     return {"status": "healthy"}
+
+
+@app.get("/health/ready", tags=["Health"])
+def readiness():
+    """Readiness: can this instance actually serve? Checks the DB and,
+    when configured, Redis. 503 tells the platform to hold traffic."""
+    from database.database import engine
+
+    checks = {}
+    healthy = True
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        checks["database"] = "ok"
+    except Exception as exc:
+        logging.getLogger(__name__).error(f"Readiness DB check failed: {exc}")
+        checks["database"] = "error"
+        healthy = False
+
+    if settings.REDIS_URL:
+        try:
+            import redis as redis_sync
+            r = redis_sync.from_url(settings.REDIS_URL, socket_connect_timeout=2)
+            r.ping()
+            checks["redis"] = "ok"
+        except Exception as exc:
+            logging.getLogger(__name__).error(f"Readiness Redis check failed: {exc}")
+            checks["redis"] = "error"
+            healthy = False
+
+    return Response(
+        content=json.dumps({"status": "ready" if healthy else "not_ready", "checks": checks}),
+        media_type="application/json",
+        status_code=200 if healthy else 503,
+    )
+
+
+@app.get("/metrics", include_in_schema=False)
+def metrics(request: Request):
+    """Prometheus scrape target. Optionally protected by METRICS_TOKEN."""
+    if settings.METRICS_TOKEN:
+        auth = request.headers.get("Authorization", "")
+        if auth != f"Bearer {settings.METRICS_TOKEN}":
+            return Response(status_code=403)
+    return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)

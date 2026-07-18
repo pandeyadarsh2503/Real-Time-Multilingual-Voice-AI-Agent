@@ -1,10 +1,12 @@
 import asyncio
 import logging
+import time
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, UploadFile, File, Form
 from pydantic import BaseModel, Field
 
+from core.metrics import STT_LATENCY, TTS_LATENCY
 from core.rate_limit import limiter
 from services.auth_service import get_current_user
 from services.stt_service import transcribe
@@ -37,7 +39,10 @@ async def speech_to_text(
 
     try:
         # Whisper inference is CPU-bound — keep it off the event loop.
-        return await asyncio.to_thread(transcribe, audio_bytes, language_hint)
+        start = time.perf_counter()
+        result = await asyncio.to_thread(transcribe, audio_bytes, language_hint)
+        STT_LATENCY.observe(time.perf_counter() - start)
+        return result
     except Exception:
         logger.exception("STT error")
         raise HTTPException(status_code=500, detail="Transcription failed. Please try again.")
@@ -56,7 +61,9 @@ async def text_to_speech(request: Request, req: TTSRequest):
     Accept text + language code → return MP3 audio bytes.
     """
     try:
+        start = time.perf_counter()
         audio_bytes = await asyncio.to_thread(synthesize_speech, req.text, req.language)
+        TTS_LATENCY.observe(time.perf_counter() - start)
         return Response(
             content=audio_bytes,
             media_type="audio/mpeg",

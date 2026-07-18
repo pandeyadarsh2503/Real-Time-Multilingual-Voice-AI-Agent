@@ -16,6 +16,13 @@ class Settings(BaseSettings):
     TTS_PROVIDER: str = "azure"
     CLINIC_TIMEZONE: str = "Asia/Kolkata"
 
+    # ── Observability ─────────────────────────────────────
+    LOG_FORMAT: str = "text"             # "text" for dev, "json" for production
+    METRICS_TOKEN: str = ""              # optional bearer token protecting /metrics
+    OTEL_EXPORTER_OTLP_ENDPOINT: str = ""  # e.g. Grafana Cloud OTLP gateway; empty = tracing off
+    OTEL_EXPORTER_OTLP_HEADERS: str = ""   # e.g. Authorization=Basic <base64 instance:token>
+    OTEL_SERVICE_NAME: str = "swasthyaai-backend"
+
     # ── Memory / Redis ────────────────────────────────────
     REDIS_URL: str = ""                  # e.g. rediss://default:<pass>@<host>:6379 (Upstash)
     SESSION_TTL_SECONDS: int = 1800      # sliding TTL for live conversations

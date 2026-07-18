@@ -5,8 +5,10 @@ Supports: book_appointment, reschedule_appointment, cancel_appointment, check_av
 import asyncio
 import json
 import logging
+import time
 from groq import Groq
 from config import settings, GROQ_MODEL, DOCTOR_NAMES, DOCTORS, clinic_now, clinic_today
+from core.metrics import LLM_LATENCY, TOOL_CALLS
 
 logger = logging.getLogger(__name__)
 # timeout + bounded retries so a hung Groq call can't pin a request forever
@@ -200,6 +202,7 @@ async def run_agent(messages: list, tool_executor, max_iter: int = 6) -> tuple[s
     for _ in range(max_iter):
         # The Groq SDK is synchronous — run it in a worker thread so a
         # multi-second LLM call never blocks the event loop.
+        llm_start = time.perf_counter()
         response = await asyncio.to_thread(
             client.chat.completions.create,
             model=GROQ_MODEL,
@@ -209,6 +212,7 @@ async def run_agent(messages: list, tool_executor, max_iter: int = 6) -> tuple[s
             max_tokens=512,
             temperature=0.3,
         )
+        LLM_LATENCY.observe(time.perf_counter() - llm_start)
 
         msg = response.choices[0].message
 
@@ -261,6 +265,10 @@ async def run_agent(messages: list, tool_executor, max_iter: int = 6) -> tuple[s
             except Exception:
                 logger.exception(f"Tool {tc.function.name} raised")
                 result = {"error": "The tool failed unexpectedly. Apologise and ask the user to try again."}
+            TOOL_CALLS.labels(
+                tool=tc.function.name,
+                outcome="error" if (isinstance(result, dict) and result.get("error")) else "success",
+            ).inc()
             logger.info(f"Tool result ← {result}")
 
             msgs.append({
