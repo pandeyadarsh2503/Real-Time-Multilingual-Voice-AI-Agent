@@ -75,6 +75,7 @@ def test_unauthenticated_requests_are_rejected(client):
     assert client.get("/api/doctors").status_code in (401, 503)
     assert client.post("/api/chat", json={"message": "hi", "session_id": "s1"}).status_code in (401, 503)
     assert client.post("/api/voice/tts", json={"text": "hi"}).status_code in (401, 503)
+    assert client.post("/api/voice/rtc/offer", json={"sdp": "v=0", "type": "offer"}).status_code in (401, 503)
     assert client.delete("/api/appointments/ASHA0001").status_code in (401, 503)
 
 
@@ -141,14 +142,14 @@ def test_authorized_chat_success_path_with_rate_limit_headers(client, monkeypatc
     crash on SUCCESSFUL calls because slowapi had no Response object to
     inject its headers into (only 401/429 paths had been exercised).
     """
-    import routers.chat as chat_module
+    import services.agent_runtime as agent_runtime
 
     async def fake_agent(messages, tool_executor, max_iter=6):
         return "Hello! How can I help?", messages + [
             {"role": "assistant", "content": "Hello! How can I help?"}
         ]
 
-    monkeypatch.setattr(chat_module, "run_agent", fake_agent)
+    monkeypatch.setattr(agent_runtime, "run_agent", fake_agent)
     login_as(PATIENT_ASHA)
     resp = client.post("/api/chat", json={"message": "hi", "session_id": "s-reg"})
     assert resp.status_code == 200, resp.text

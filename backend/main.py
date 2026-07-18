@@ -41,6 +41,13 @@ async def lifespan(app: FastAPI):
         logger.warning("⚠️  AUTH_DISABLED=true — API is running WITHOUT authentication.")
     elif not settings.FIREBASE_PROJECT_ID:
         logger.warning("⚠️  FIREBASE_PROJECT_ID is not set — authenticated endpoints will return 503.")
+
+    # Warm the Whisper model off the critical path so the first live
+    # utterance pays inference cost only, never model loading.
+    import asyncio as _asyncio
+
+    from services.stt_service import warm_up
+    _asyncio.get_event_loop().run_in_executor(None, warm_up)
     yield
     # ── Shutdown ───────────────────────────────────────────
     logger.info("🛑 Server shutting down.")
@@ -112,10 +119,11 @@ Instrumentator(excluded_handlers=["/metrics", "/health.*"]).instrument(app)
 init_tracing(app)
 
 # ── Routers ────────────────────────────────────────────────
-from routers import appointments, chat, outbound, voice  # noqa: E402
+from routers import appointments, chat, outbound, rtc, voice  # noqa: E402
 
 app.include_router(chat.router,         prefix="/api", tags=["Chat"])
 app.include_router(voice.router,        prefix="/api", tags=["Voice"])
+app.include_router(rtc.router,          prefix="/api", tags=["Live Voice"])
 app.include_router(appointments.router, prefix="/api", tags=["Appointments"])
 app.include_router(outbound.router,     prefix="/api", tags=["Outbound"])
 

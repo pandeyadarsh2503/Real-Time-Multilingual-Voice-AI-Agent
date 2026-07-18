@@ -57,6 +57,34 @@ def transcribe(audio_bytes: bytes, language_hint: str | None = None) -> dict:
         os.unlink(tmp_path)
 
 
+def warm_up():
+    """Load the Whisper model ahead of the first request (called at
+    startup in a worker thread) so first-utterance latency is model
+    inference only, never model loading."""
+    _get_model()
+
+
+def transcribe_pcm(pcm_f32, language_hint: str | None = None) -> dict:
+    """
+    Transcribe a float32 mono 16 kHz numpy array (the live-voice path —
+    no temp files, no container decode).
+    Returns: { text, language, confidence }
+    """
+    model = _get_model()
+    kwargs = {}
+    if language_hint and language_hint in ("en", "hi", "ta"):
+        kwargs["language"] = language_hint
+
+    segments, info = model.transcribe(pcm_f32, beam_size=5, **kwargs)
+    text = " ".join(seg.text.strip() for seg in segments).strip()
+    detected = info.language if info.language in ("en", "hi", "ta") else "en"
+    return {
+        "text": text,
+        "language": detected,
+        "confidence": round(info.language_probability, 3),
+    }
+
+
 def detect_language_from_text(text: str) -> str:
     """Heuristic language detection from Unicode character ranges."""
     for ch in text:

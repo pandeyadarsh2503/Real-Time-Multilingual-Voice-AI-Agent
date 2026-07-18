@@ -1,4 +1,5 @@
-import { useState, useCallback } from 'react'
+import { useCallback, useState } from 'react'
+import { useLiveVoice } from '../hooks/useLiveVoice'
 import { useWebRTC } from '../hooks/useWebRTC'
 import { voiceAPI } from '../services/api'
 
@@ -8,15 +9,39 @@ export default function VoiceInterface({
   language,
   setLanguage,
   disabled,
-  status
+  status,
+  onLiveUserText,
+  onLiveAIText,
 }) {
   const [textValue, setTextValue] = useState('')
+  const [partial, setPartial] = useState('')
+  const [liveError, setLiveError] = useState('')
   const { isRecording, startRecording, stopRecording } = useWebRTC()
 
+  // ── Live streaming conversation (WebRTC) ────────────────
+  const liveVoice = useLiveVoice({
+    onPartial: setPartial,
+    onFinal: (text, lang) => {
+      if (lang) setLanguage(lang)
+      onLiveUserText?.(text, lang || language)
+    },
+    onAgentResponse: (text, lang) => onLiveAIText?.(text, lang || language),
+    onState: (state) => onStatusChange(state === 'ready' ? 'ready' : state),
+    onError: (msg) => {
+      setLiveError(msg)
+      setTimeout(() => setLiveError(''), 6000)
+    },
+  })
 
+  const toggleLive = useCallback(() => {
+    setPartial('')
+    if (liveVoice.live) liveVoice.stop()
+    else liveVoice.start()
+  }, [liveVoice])
 
+  // ── Push-to-talk (record → upload) fallback ─────────────
   const handleMic = useCallback(async () => {
-    if (disabled) return
+    if (disabled || liveVoice.live) return
 
     if (!isRecording) {
       const ok = await startRecording()
@@ -38,7 +63,7 @@ export default function VoiceInterface({
         onStatusChange('ready')
       }
     }
-  }, [disabled, isRecording, startRecording, stopRecording, language, setLanguage, sendChatMessage, onStatusChange])
+  }, [disabled, liveVoice.live, isRecording, startRecording, stopRecording, language, setLanguage, sendChatMessage, onStatusChange])
 
   const handleTextSend = useCallback(async () => {
     const text = textValue.trim()
@@ -51,15 +76,36 @@ export default function VoiceInterface({
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleTextSend() }
   }
 
+  const hint = liveError
+    ? `⚠️ ${liveError}`
+    : liveVoice.live
+      ? (partial ? `“${partial}…”` : '🎧 Live conversation — just speak naturally')
+      : liveVoice.connecting
+        ? 'Connecting live voice…'
+        : status === 'thinking' ? 'Thinking...'
+          : status === 'speaking' ? 'Speaking...'
+            : 'Go Live for a hands-free conversation, or use the mic / type 🛈'
+
   return (
     <div className="input-overlay">
       <div className="input-pill-container">
-        
-        {/* Inline Mic Button on the left */}
+
+        {/* Live conversation toggle */}
+        <button
+          className={`mic-inline-btn ${liveVoice.live ? 'recording' : ''}`}
+          onClick={toggleLive}
+          disabled={liveVoice.connecting}
+          title={liveVoice.live ? 'End live conversation' : 'Start live conversation'}
+        >
+          {liveVoice.connecting ? '⏳' : liveVoice.live ? '🔴' : '🎧'}
+        </button>
+
+        {/* Push-to-talk mic */}
         <button
           className={`mic-inline-btn ${isRecording ? 'recording' : ''}`}
           onClick={handleMic}
-          disabled={disabled}
+          disabled={disabled || liveVoice.live}
+          title="Push-to-talk"
         >
           {isRecording ? '⏹' : '🎤'}
         </button>
@@ -67,27 +113,23 @@ export default function VoiceInterface({
         {/* Text input */}
         <input
           className="input-field"
-          placeholder="Type your message..."
+          placeholder={liveVoice.live ? 'Live conversation in progress…' : 'Type your message...'}
           value={textValue}
           onChange={(e) => setTextValue(e.target.value)}
           onKeyDown={onKeyDown}
-          disabled={disabled || isRecording}
+          disabled={disabled || isRecording || liveVoice.live}
         />
-
-
 
         {/* Send Icon */}
         <button
           className="input-send"
           onClick={handleTextSend}
-          disabled={!textValue.trim() || disabled || isRecording}
+          disabled={!textValue.trim() || disabled || isRecording || liveVoice.live}
         >
           ➤
         </button>
       </div>
-      <div className="input-hint">
-         {status === 'thinking' ? 'Thinking...' : status === 'speaking' ? 'Speaking...' : 'Click the mic and speak or type your message 🛈'}
-      </div>
+      <div className="input-hint">{hint}</div>
     </div>
   )
 }

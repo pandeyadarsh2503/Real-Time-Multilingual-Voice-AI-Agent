@@ -69,6 +69,8 @@ export default function HomeView({
               disabled={isDisabled}
               status={status}
               sendChatMessage={sendChatMessage}
+              onLiveUserText={handleUserMessage}
+              onLiveAIText={handleAIResponse}
             />
           </div>
         </div>

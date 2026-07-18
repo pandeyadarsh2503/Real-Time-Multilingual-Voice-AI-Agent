@@ -17,6 +17,8 @@ api.interceptors.request.use(async (config) => {
   return config
 })
 
+export default api
+
 // ── Chat ───────────────────────────────────────────────────
 export const chatAPI = {
   send: (message, sessionId, patientName = null, language = null) =>
