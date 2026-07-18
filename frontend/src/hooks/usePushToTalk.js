@@ -1,11 +1,12 @@
 import { useState, useRef, useCallback } from 'react'
 
 /**
- * useWebRTC
+ * usePushToTalk — record-then-upload microphone capture (MediaRecorder).
+ * Not WebRTC: the real streaming path lives in useLiveVoice.js.
  * Manages microphone capture via MediaRecorder.
  * Returns blob when stopRecording() is called.
  */
-export function useWebRTC() {
+export function usePushToTalk() {
   const [isRecording, setIsRecording]           = useState(false)
   const mediaRecorderRef                         = useRef(null)
   const chunksRef                                = useRef([])

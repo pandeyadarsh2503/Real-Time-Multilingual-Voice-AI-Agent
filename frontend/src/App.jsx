@@ -1,39 +1,62 @@
-import { useState, useCallback, useEffect, useRef } from 'react'
-import { v4 as uuidv4 } from 'uuid'
-import { auth } from './firebase'
 import { onAuthStateChanged, signOut } from 'firebase/auth'
-import { appointmentsAPI, doctorsAPI, chatAPI, voiceAPI } from './services/api'
+import { useCallback, useEffect, useState } from 'react'
+import toast, { Toaster } from 'react-hot-toast'
+import { auth } from './firebase'
+import { appointmentsAPI, doctorsAPI } from './services/api'
 
-import LeftSidebar     from './components/LeftSidebar'
-import HomeView        from './components/views/HomeView'
+import { ChatProvider, useChat } from './context/ChatContext'
+
+import LeftSidebar from './components/LeftSidebar'
+import Login from './components/Login'
 import AppointmentsView from './components/views/AppointmentsView'
-import DoctorsView     from './components/views/DoctorsView'
-import HistoryView     from './components/views/HistoryView'
-import ProfileView     from './components/views/ProfileView'
-import SettingsView    from './components/views/SettingsView'
-import Login           from './components/Login'
-
-// ── Persistent session ID ─────────────────────────────────
-function getSessionId() {
-  // Always start a fresh chat session on reload so backend memory doesn't leak
-  // into a blank frontend.
-  return uuidv4()
-}
+import DoctorsView from './components/views/DoctorsView'
+import HistoryView from './components/views/HistoryView'
+import HomeView from './components/views/HomeView'
+import ProfileView from './components/views/ProfileView'
+import SettingsView from './components/views/SettingsView'
 
 // ── Main App ──────────────────────────────────────────────
 export default function App() {
-  const audioRef = useRef(null)
-  const [user, setUser]                 = useState(null)
-  const patientName                     = user?.displayName || 'Guest'
-  const [authLoading, setAuthLoading]   = useState(true)
-  const [sessionId]                     = useState(getSessionId)
-  const [messages, setMessages]         = useState([])
-  const [status, setStatus]             = useState('ready')
-  const [language, setLanguage]         = useState('en')
-  
-  // Dashboard routing state
-  const [activeTab, setActiveTab]       = useState('Home')
-  const [activities, setActivities]     = useState([])
+  const [user, setUser] = useState(null)
+  const [userPhone, setUserPhone] = useState('')
+  const [authLoading, setAuthLoading] = useState(true)
+
+  // Firebase Auth Listener
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser)
+      // Phone lives in localStorage — Firebase's phoneNumber property is
+      // read-only and can't be set from the email/password flow.
+      setUserPhone(currentUser ? localStorage.getItem(`phone_${currentUser.uid}`) || '' : '')
+      setAuthLoading(false)
+    })
+    return () => unsubscribe()
+  }, [])
+
+  if (authLoading) {
+    return <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center' }}>Loading...</div>
+  }
+
+  if (!user) {
+    return (
+      <>
+        <Toaster position="top-right" />
+        <Login />
+      </>
+    )
+  }
+
+  return (
+    <ChatProvider user={user}>
+      <Toaster position="top-right" />
+      <AuthedApp user={user} userPhone={userPhone} />
+    </ChatProvider>
+  )
+}
+
+function AuthedApp({ user, userPhone }) {
+  const { sendChatMessage, patientName } = useChat()
+  const [activeTab, setActiveTab] = useState('Home')
   const [dashboardData, setDashboardData] = useState({
     upcomingAppointment: null,
     recentDoctors: [],
@@ -41,209 +64,91 @@ export default function App() {
       { id: 'book', icon: '📅', title: 'Book Appointment', bgColor: '#f0f9ff', iconColor: '#3b82f6', prompt: 'Book an appointment' },
       { id: 'check', icon: '🗓️', title: 'Check Availability', bgColor: '#f0fdf4', iconColor: '#10b981', prompt: 'Check availability' },
       { id: 'reschedule', icon: '🔄', title: 'Reschedule Appointment', bgColor: '#fff7ed', iconColor: '#f59e0b', prompt: 'Reschedule my appointment' },
-      { id: 'cancel', icon: '❌', title: 'Cancel Appointment', bgColor: '#fef2f2', iconColor: '#ef4444', prompt: 'Cancel appointment' }
-    ]
+      { id: 'cancel', icon: '❌', title: 'Cancel Appointment', bgColor: '#fef2f2', iconColor: '#ef4444', prompt: 'Cancel appointment' },
+    ],
   })
 
+  // Dashboard data polling
   useEffect(() => {
-    if (!user) return;
+    let failedOnce = false
     const fetchDashboardData = async () => {
       try {
         const [upcomingRes, doctorsRes] = await Promise.all([
-          appointmentsAPI.upcoming(1, user?.displayName || 'Guest'),
-          doctorsAPI.list()
-        ]);
-        
-        const upcomingAppts = upcomingRes.data;
-        let upcomingAppointment = null;
-        if (upcomingAppts && upcomingAppts.length > 0) {
-          const apt = upcomingAppts[0];
-          upcomingAppointment = {
-            id: apt.id,
-            doctorName: apt.doctor,
-            specialty: 'Specialist',
-            status: apt.status === 'scheduled' ? 'Confirmed' : apt.status,
-            date: apt.date,
-            time: apt.time,
-            location: 'Clinic',
-          };
-        }
+          appointmentsAPI.upcoming(1),
+          doctorsAPI.list(),
+        ])
 
-        const docs = doctorsRes.data.map(d => ({
+        const apt = upcomingRes.data?.[0]
+        const upcomingAppointment = apt ? {
+          id: apt.id,
+          doctorName: apt.doctor,
+          status: apt.status === 'scheduled' ? 'Confirmed' : apt.status,
+          date: apt.date,
+          time: apt.time,
+        } : null
+
+        const docs = doctorsRes.data.map((d) => ({
           id: d.name,
           name: d.name,
           specialty: d.specialty,
           icon: d.icon,
-          imgUrl: `https://ui-avatars.com/api/?name=${encodeURIComponent(d.name)}&background=random`
-        }));
+          imgUrl: `https://ui-avatars.com/api/?name=${encodeURIComponent(d.name)}&background=random`,
+        }))
 
-        setDashboardData(prev => ({
-          ...prev,
-          upcomingAppointment,
-          recentDoctors: docs
-        }));
+        setDashboardData((prev) => ({ ...prev, upcomingAppointment, recentDoctors: docs }))
+        failedOnce = false
       } catch (err) {
-        console.error('Failed to load dashboard data:', err);
-      }
-    };
-    
-    fetchDashboardData();
-    const intervalId = setInterval(fetchDashboardData, 15000);
-    return () => clearInterval(intervalId);
-  }, [user]);
-
-  const addActivity = useCallback((icon, title, desc) => {
-    setActivities(prev => [{ id: uuidv4(), icon, title, desc, time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) }, ...prev])
-  }, [])
-
-  // Firebase Auth Listener
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      if (currentUser) {
-        // Augment user object with locally stored phone number if available
-        const storedPhone = localStorage.getItem(`phone_${currentUser.uid}`)
-        if (storedPhone) {
-          currentUser.phoneNumber = storedPhone
+        console.error('Failed to load dashboard data:', err)
+        if (!failedOnce) {
+          failedOnce = true
+          toast.error('Could not reach the server — retrying in the background.')
         }
       }
-      setUser(currentUser)
-      setAuthLoading(false)
-    })
-    return () => unsubscribe()
+    }
+
+    fetchDashboardData()
+    const intervalId = setInterval(fetchDashboardData, 15000)
+    return () => clearInterval(intervalId)
   }, [])
 
-  const handleLogout = () => {
-    signOut(auth)
-  }
+  const handleLogout = () => signOut(auth)
 
-  const addMessage = useCallback((role, content, lang) => {
-    setMessages((prev) => [
-      ...prev,
-      { id: uuidv4(), role, content, language: lang, ts: Date.now() },
-    ])
-  }, [])
-
-  const handleUserMessage = useCallback((text, lang) => {
-    addMessage('user', text, lang)
-    if (text.toLowerCase().includes('book')) addActivity('📅', 'Booking Attempt', text)
-    else if (text.toLowerCase().includes('cancel')) addActivity('❌', 'Cancellation', text)
-    else addActivity('💬', 'Chat Message', text.length > 25 ? text.substring(0,25)+'...' : text)
-  }, [addMessage, addActivity])
-
-  const handleAIResponse = useCallback((text, lang) => {
-    addMessage('assistant', text, lang)
-    if (lang) setLanguage(lang)
-  }, [addMessage])
-
-  const playAudio = useCallback(async (text, lang) => {
-    try {
-      setStatus('speaking')
-      const res  = await voiceAPI.tts(text, lang)
-      const url  = URL.createObjectURL(res.data)
-      const audio = new Audio(url)
-      audioRef.current = audio
-      audio.onended = () => {
-        URL.revokeObjectURL(url)
-        setStatus('ready')
-      }
-      audio.onerror = () => setStatus('ready')
-      audio.play()
-    } catch {
-      setStatus('ready')
-    }
-  }, [])
-
-  const sendChatMessage = useCallback(async (userText) => {
-    if (!userText.trim()) return
-    handleUserMessage(userText, language)
-    setStatus('thinking')
-    try {
-      const res = await chatAPI.send(userText, sessionId, patientName, language)
-      const { response, language: detectedLang } = res.data
-      if (detectedLang && detectedLang !== language) setLanguage(detectedLang)
-      handleAIResponse(response, detectedLang || language)
-      await playAudio(response, detectedLang || language)
-    } catch (err) {
-      const errMsg = err.response?.data?.detail || 'Something went wrong. Please try again.'
-      handleAIResponse(errMsg, language)
-      setStatus('ready')
-    }
-  }, [sessionId, patientName, language, handleUserMessage, handleAIResponse, playAudio])
-
-  // Initial greeting trigger after login
-  useEffect(() => {
-    if (user && messages.length === 0) {
-      setMessages([{
-        id: uuidv4(),
-        role: 'assistant',
-        content: `Hello ${user.displayName || 'Guest'}! I'm your AI healthcare assistant.\nYou can book appointments, check availability, or ask me anything.`,
-        language: 'en',
-        ts: Date.now(),
-      }])
-    }
-  }, [user]) // eslint-disable-line
-
-  if (authLoading) {
-    return <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center' }}>Loading...</div>
-  }
-
-  if (!user) {
-    return <Login />
-  }
+  const chatHandoff = useCallback((prompt) => {
+    setActiveTab('Home')
+    setTimeout(() => sendChatMessage(prompt), 100)
+  }, [sendChatMessage])
 
   const renderActiveView = () => {
     switch (activeTab) {
       case 'Home':
-        return (
-          <HomeView 
-            patientName={patientName}
-            messages={messages}
-            status={status}
-            language={language}
-            setLanguage={setLanguage}
-            sessionId={sessionId}
-            handleUserMessage={handleUserMessage}
-            handleAIResponse={handleAIResponse}
-            setStatus={setStatus}
-            activities={activities}
-            dashboardData={dashboardData}
-            sendChatMessage={sendChatMessage}
-            setActiveTab={setActiveTab}
-          />
-        );
+        return <HomeView dashboardData={dashboardData} setActiveTab={setActiveTab} />
       case 'Appointments':
-        return <AppointmentsView 
-          patientName={patientName}
-          userPhone={user?.phoneNumber || ''}
-          onNewBooking={() => {
-            setActiveTab('Home');
-            setTimeout(() => sendChatMessage('I want to book a new appointment. Which doctors are available and when?'), 100);
-          }}
-        />;
+        return (
+          <AppointmentsView
+            patientName={patientName}
+            userPhone={userPhone}
+            onNewBooking={() => chatHandoff('I want to book a new appointment. Which doctors are available and when?')}
+            onReschedule={(appt) => chatHandoff(`I want to reschedule my appointment ${appt.id} with ${appt.doctor} on ${appt.date}.`)}
+          />
+        )
       case 'Doctors':
-        return <DoctorsView 
-          onBook={(docName) => {
-            setActiveTab('Home');
-            setTimeout(() => sendChatMessage(`I want to book an appointment with ${docName}`), 100);
-          }} 
-        />;
+        return <DoctorsView onBook={(docName) => chatHandoff(`I want to book an appointment with ${docName}`)} />
       case 'History':
-        return <HistoryView />;
+        return <HistoryView />
       case 'Profile':
-        return <ProfileView user={user} />;
+        return <ProfileView user={user} />
       case 'Settings':
-        return <SettingsView />;
+        return <SettingsView sessionInfo={{ language: 'en' }} />
       default:
-        return <HomeView patientName={patientName} messages={messages} status={status} language={language} setLanguage={setLanguage} sessionId={sessionId} handleUserMessage={handleUserMessage} handleAIResponse={handleAIResponse} setStatus={setStatus} activities={activities} dashboardData={dashboardData} sendChatMessage={sendChatMessage} setActiveTab={setActiveTab} />;
+        return <HomeView dashboardData={dashboardData} setActiveTab={setActiveTab} />
     }
   }
 
   return (
     <div className="app-container">
       <LeftSidebar activeTab={activeTab} setActiveTab={setActiveTab} onLogout={handleLogout} />
-      
       <main className="center-content full-width" style={{ position: 'relative' }}>
-         {renderActiveView()}
+        {renderActiveView()}
       </main>
     </div>
   )

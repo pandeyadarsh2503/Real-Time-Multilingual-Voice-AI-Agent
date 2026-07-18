@@ -1,36 +1,30 @@
 import { useCallback, useState } from 'react'
+import toast from 'react-hot-toast'
+import { useChat } from '../context/ChatContext'
 import { useLiveVoice } from '../hooks/useLiveVoice'
-import { useWebRTC } from '../hooks/useWebRTC'
+import { usePushToTalk } from '../hooks/usePushToTalk'
 import { voiceAPI } from '../services/api'
 
-export default function VoiceInterface({
-  sendChatMessage,
-  onStatusChange,
-  language,
-  setLanguage,
-  disabled,
-  status,
-  onLiveUserText,
-  onLiveAIText,
-}) {
+export default function VoiceInterface({ disabled }) {
+  const {
+    status, setStatus, language, setLanguage,
+    sendChatMessage, handleUserMessage, handleAIResponse,
+  } = useChat()
+
   const [textValue, setTextValue] = useState('')
   const [partial, setPartial] = useState('')
-  const [liveError, setLiveError] = useState('')
-  const { isRecording, startRecording, stopRecording } = useWebRTC()
+  const { isRecording, startRecording, stopRecording } = usePushToTalk()
 
   // ── Live streaming conversation (WebRTC) ────────────────
   const liveVoice = useLiveVoice({
     onPartial: setPartial,
     onFinal: (text, lang) => {
       if (lang) setLanguage(lang)
-      onLiveUserText?.(text, lang || language)
+      handleUserMessage(text, lang || language)
     },
-    onAgentResponse: (text, lang) => onLiveAIText?.(text, lang || language),
-    onState: (state) => onStatusChange(state === 'ready' ? 'ready' : state),
-    onError: (msg) => {
-      setLiveError(msg)
-      setTimeout(() => setLiveError(''), 6000)
-    },
+    onAgentResponse: (text, lang) => handleAIResponse(text, lang || language),
+    onState: (state) => setStatus(state === 'ready' ? 'ready' : state),
+    onError: (msg) => toast.error(msg),
   })
 
   const toggleLive = useCallback(() => {
@@ -45,25 +39,31 @@ export default function VoiceInterface({
 
     if (!isRecording) {
       const ok = await startRecording()
-      if (ok) onStatusChange('listening')
+      if (ok) setStatus('listening')
+      else toast.error('Microphone access was denied.')
     } else {
       const blob = await stopRecording()
       if (!blob) return
-      onStatusChange('thinking')
+      setStatus('thinking')
 
       try {
         const sttRes = await voiceAPI.stt(blob, language)
         const { text, language: detectedLang } = sttRes.data
 
-        if (!text.trim()) { onStatusChange('ready'); return }
+        if (!text.trim()) {
+          toast('No speech detected — please try again.', { icon: '🎤' })
+          setStatus('ready')
+          return
+        }
         if (detectedLang) setLanguage(detectedLang)
 
         await sendChatMessage(text)
-      } catch {
-        onStatusChange('ready')
+      } catch (err) {
+        toast.error(err.response?.data?.detail || 'Transcription failed. Please try again.')
+        setStatus('ready')
       }
     }
-  }, [disabled, liveVoice.live, isRecording, startRecording, stopRecording, language, setLanguage, sendChatMessage, onStatusChange])
+  }, [disabled, liveVoice.live, isRecording, startRecording, stopRecording, language, setLanguage, sendChatMessage, setStatus])
 
   const handleTextSend = useCallback(async () => {
     const text = textValue.trim()
@@ -76,15 +76,13 @@ export default function VoiceInterface({
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleTextSend() }
   }
 
-  const hint = liveError
-    ? `⚠️ ${liveError}`
-    : liveVoice.live
-      ? (partial ? `“${partial}…”` : '🎧 Live conversation — just speak naturally')
-      : liveVoice.connecting
-        ? 'Connecting live voice…'
-        : status === 'thinking' ? 'Thinking...'
-          : status === 'speaking' ? 'Speaking...'
-            : 'Go Live for a hands-free conversation, or use the mic / type 🛈'
+  const hint = liveVoice.live
+    ? (partial ? `“${partial}…”` : '🎧 Live conversation — just speak naturally')
+    : liveVoice.connecting
+      ? 'Connecting live voice…'
+      : status === 'thinking' ? 'Thinking...'
+        : status === 'speaking' ? 'Speaking...'
+          : 'Go Live for a hands-free conversation, or use the mic / type 🛈'
 
   return (
     <div className="input-overlay">

@@ -35,9 +35,9 @@ export default function LeftSidebar({ activeTab, setActiveTab, onLogout }) {
         <div className="help-title" style={{display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold', fontSize: '15px', marginBottom: '8px'}}>
           Need Help?
         </div>
-        <div className="help-desc" style={{fontSize: '12px', opacity: 0.9, marginBottom: '20px', lineHeight: 1.5}}>Talk to our assistant now or call us.</div>
-        <button className="help-btn" onClick={() => alert("Initiating Exotel call or browser-based voice simulation...")} style={{background: 'rgba(20, 184, 166, 0.2)', border: '1px solid #14b8a6', borderRadius: '8px', padding: '10px 12px', width: '100%', color: 'white', fontSize: '13px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'}}>
-          📞 Call Assistant
+        <div className="help-desc" style={{fontSize: '12px', opacity: 0.9, marginBottom: '20px', lineHeight: 1.5}}>Talk to the assistant by voice or text.</div>
+        <button className="help-btn" onClick={() => setActiveTab('Home')} style={{background: 'rgba(20, 184, 166, 0.2)', border: '1px solid #14b8a6', borderRadius: '8px', padding: '10px 12px', width: '100%', color: 'white', fontSize: '13px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'}}>
+          🎧 Talk to Assistant
         </button>
       </div>
 
