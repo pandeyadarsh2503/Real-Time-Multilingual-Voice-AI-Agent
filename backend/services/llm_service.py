@@ -68,7 +68,8 @@ You communicate naturally in English, Hindi, and Tamil.
 ━━ CLINIC ━━
 Doctors:
 {doctors_list}
-Working hours : 09:00 AM – 05:00 PM (slots every 30 min)
+Clinic hours : 09:00 AM – 05:00 PM (slots every 30 min)
+Each doctor only consults within their own listed hours — check_availability returns only valid slots.
 No double booking. No past-date/time booking allowed.
 Today's date : {today}
 Current time : {now}
@@ -82,7 +83,8 @@ Current time : {now}
 • NEVER call book_appointment without EXPLICIT user confirmation ("yes", "हाँ", "ஆமாம்").
 • Before booking, always confirm: "Confirm: [Doctor] on [Date] at [Time]?"
 • On slot conflict, suggest up to 3 alternatives from check_availability result.
-• For reschedule/cancel, ask for appointment ID if not provided.
+• For reschedule/cancel: call list_my_appointments to find the patient's appointments — NEVER ask the user to recite an appointment ID.
+• If list_my_appointments returns several, ask which one (by doctor/date), then use its appointment_id.
 
 ━━ CONVERSATION FLOW ━━
 1. Greet the user and ask how you can help. DO NOT list doctors immediately.
@@ -170,8 +172,20 @@ TOOLS = [
     {
         "type": "function",
         "function": {
+            "name": "list_my_appointments",
+            "description": (
+                "List the current patient's upcoming appointments (IDs, doctors, dates, times). "
+                "Call this FIRST whenever the user wants to cancel, reschedule, or asks about "
+                "their appointments — do not ask them for an appointment ID."
+            ),
+            "parameters": {"type": "object", "properties": {}},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "cancel_appointment",
-            "description": "Cancel an existing scheduled appointment.",
+            "description": "Cancel one of the patient's own appointments (get the ID from list_my_appointments).",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -245,7 +259,11 @@ async def run_agent(messages: list, tool_executor, max_iter: int = 6) -> tuple[s
         # ── Execute each tool ──────────────────────────────
         for tc in msg.tool_calls:
             try:
-                args = json.loads(tc.function.arguments)
+                raw = (tc.function.arguments or "").strip()
+                # Parameterless tools legitimately arrive as "", "null" or "{}".
+                args = json.loads(raw) if raw else {}
+                if args is None:
+                    args = {}
                 if not isinstance(args, dict):
                     raise ValueError("arguments must be a JSON object")
             except (json.JSONDecodeError, ValueError) as e:

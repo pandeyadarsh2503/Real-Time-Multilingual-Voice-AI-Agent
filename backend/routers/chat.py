@@ -24,6 +24,7 @@ from tools.appointment_tools import (
     book_appointment,
     cancel_appointment,
     check_availability,
+    list_my_appointments,
     reschedule_appointment,
 )
 
@@ -83,6 +84,7 @@ async def chat(
         REQUIRED_ARGS = {
             "check_availability":     ("doctor", "date"),
             "book_appointment":       ("name", "doctor", "date", "time"),
+            "list_my_appointments":   (),
             "reschedule_appointment": ("appointment_id", "new_date", "new_time"),
             "cancel_appointment":     ("appointment_id",),
         }
@@ -111,12 +113,16 @@ async def chat(
                     }, db, uid=user["uid"])
                 return result
 
+            if tool_name == "list_my_appointments":
+                return list_my_appointments(db, patient_uid=user["uid"], patient_name=patient_name)
+
             if tool_name == "reschedule_appointment":
                 return reschedule_appointment(
-                    args["appointment_id"], args["new_date"], args["new_time"], db
+                    args["appointment_id"], args["new_date"], args["new_time"], db,
+                    patient_uid=user["uid"],
                 )
 
-            return cancel_appointment(args["appointment_id"], db)
+            return cancel_appointment(args["appointment_id"], db, patient_uid=user["uid"])
 
         # 5. Run LLM agent
         current_messages = await get_session(session_key, db)

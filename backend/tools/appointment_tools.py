@@ -2,10 +2,11 @@ import uuid
 from datetime import date, datetime
 from typing import Optional
 
+from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from config import DOCTOR_NAMES, TIME_SLOTS, clinic_now, clinic_today
+from config import DOCTOR_HOURS, DOCTOR_NAMES, TIME_SLOTS, clinic_now, clinic_today
 from database.models import (
     BLOCKING_STATUSES,
     STATUS_CANCELLED,
@@ -29,13 +30,31 @@ def _slot_in_past(appt_date: date, time_str: str) -> bool:
     return slot_time <= clinic_now().time()
 
 
+def _doctor_slots(doctor: str) -> list[str]:
+    """Clinic slots that fall inside this doctor's consulting window."""
+    start, end = DOCTOR_HOURS[doctor]
+    return [s for s in TIME_SLOTS if start <= s < end]
+
+
 def _suggest_slots(doctor: str, date_str: str, db: Session, limit: int = 3) -> list:
     avail = check_availability(doctor, date_str, db)
     return avail.get("available_slots", [])[:limit]
 
 
+def _owned_filter(query, patient_uid: Optional[str]):
+    """Restrict to the caller's appointments. Legacy rows without a uid
+    stay reachable (they predate authentication and can't be verified)."""
+    if patient_uid:
+        query = query.filter(or_(
+            Appointment.patient_uid == patient_uid,
+            Appointment.patient_uid.is_(None),
+        ))
+    return query
+
+
 def check_availability(doctor: str, date_str: str, db: Session) -> dict:
-    """Return available 30-min slots for a doctor on a given date."""
+    """Return available slots for a doctor on a given date, within that
+    doctor's consulting hours."""
     if doctor not in DOCTOR_NAMES:
         return {
             "error": f"Doctor '{doctor}' not found.",
@@ -56,13 +75,15 @@ def check_availability(doctor: str, date_str: str, db: Session) -> dict:
     booked_times = {a.time for a in booked}
 
     available = [
-        slot for slot in TIME_SLOTS
+        slot for slot in _doctor_slots(doctor)
         if slot not in booked_times and not _slot_in_past(appt_date, slot)
     ]
 
+    start, end = DOCTOR_HOURS[doctor]
     return {
         "doctor": doctor,
         "date": date_str,
+        "consulting_hours": f"{start}–{end}",
         "available_slots": available,
         "total_available": len(available),
     }
@@ -89,6 +110,13 @@ def book_appointment(
 
     if time_str not in TIME_SLOTS:
         return {"error": f"'{time_str}' is not a valid slot. Valid slots: {', '.join(TIME_SLOTS)}"}
+
+    if time_str not in _doctor_slots(doctor):
+        start, end = DOCTOR_HOURS[doctor]
+        return {
+            "error": f"{doctor} consults between {start} and {end}. '{time_str}' is outside those hours.",
+            "suggested_slots": _suggest_slots(doctor, date_str, db),
+        }
 
     if _slot_in_past(appt_date, time_str):
         return {"error": "This time slot has already passed for today."}
@@ -145,11 +173,57 @@ def book_appointment(
     }
 
 
-def reschedule_appointment(appointment_id: str, new_date: str, new_time: str, db: Session) -> dict:
-    """Move an existing active appointment to a new slot."""
-    appt = db.query(Appointment).filter(
-        Appointment.id == appointment_id,
+def list_my_appointments(db: Session, patient_uid: Optional[str], patient_name: Optional[str] = None) -> dict:
+    """Active appointments for this patient from today onwards — lets the
+    agent resolve 'cancel my appointment with Dr X' without the user
+    ever reciting an ID."""
+    q = db.query(Appointment).filter(
+        Appointment.date >= clinic_today().strftime("%Y-%m-%d"),
         Appointment.status.in_(BLOCKING_STATUSES),
+    )
+    if patient_uid:
+        ownership = [Appointment.patient_uid == patient_uid]
+        if patient_name:
+            # legacy rows: no uid recorded, matched by name
+            ownership.append(
+                Appointment.patient_uid.is_(None) & (Appointment.patient_name == patient_name)
+            )
+        q = q.filter(or_(*ownership))
+    elif patient_name:
+        q = q.filter(Appointment.patient_name == patient_name)
+    else:
+        return {"appointments": [], "count": 0}
+
+    rows = q.order_by(Appointment.date, Appointment.time).limit(10).all()
+    return {
+        "appointments": [
+            {
+                "appointment_id": a.id,
+                "doctor": a.doctor,
+                "date": a.date,
+                "time": a.time,
+                "status": a.status,
+            }
+            for a in rows
+        ],
+        "count": len(rows),
+    }
+
+
+def reschedule_appointment(
+    appointment_id: str,
+    new_date: str,
+    new_time: str,
+    db: Session,
+    patient_uid: Optional[str] = None,
+) -> dict:
+    """Move an existing active appointment to a new slot."""
+    appt = _owned_filter(
+        db.query(Appointment).filter(
+            Appointment.id == appointment_id,
+            Appointment.status.in_(BLOCKING_STATUSES),
+        ),
+        patient_uid,
     ).first()
 
     if not appt:
@@ -164,6 +238,13 @@ def reschedule_appointment(appointment_id: str, new_date: str, new_time: str, db
 
     if new_time not in TIME_SLOTS:
         return {"error": f"'{new_time}' is not a valid slot."}
+
+    if new_time not in _doctor_slots(appt.doctor):
+        start, end = DOCTOR_HOURS[appt.doctor]
+        return {
+            "error": f"{appt.doctor} consults between {start} and {end}. '{new_time}' is outside those hours.",
+            "suggested_slots": _suggest_slots(appt.doctor, new_date, db),
+        }
 
     if _slot_in_past(new_date_obj, new_time):
         return {"error": "This time slot has already passed for today."}
@@ -206,11 +287,15 @@ def reschedule_appointment(appointment_id: str, new_date: str, new_time: str, db
     }
 
 
-def cancel_appointment(appointment_id: str, db: Session) -> dict:
-    """Cancel an active (scheduled or confirmed) appointment."""
-    appt = db.query(Appointment).filter(
-        Appointment.id == appointment_id,
-        Appointment.status.in_(BLOCKING_STATUSES),
+def cancel_appointment(appointment_id: str, db: Session, patient_uid: Optional[str] = None) -> dict:
+    """Cancel an active appointment. When patient_uid is given, only that
+    patient's own (or legacy unowned) appointments can be cancelled."""
+    appt = _owned_filter(
+        db.query(Appointment).filter(
+            Appointment.id == appointment_id,
+            Appointment.status.in_(BLOCKING_STATUSES),
+        ),
+        patient_uid,
     ).first()
 
     if not appt:

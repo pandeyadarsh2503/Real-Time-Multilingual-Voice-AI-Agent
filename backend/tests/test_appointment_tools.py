@@ -16,13 +16,14 @@ from sqlalchemy.orm import sessionmaker
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from config import DOCTOR_NAMES, TIME_SLOTS, clinic_today
+from config import DOCTOR_HOURS, DOCTOR_NAMES, TIME_SLOTS, clinic_today
 from database.database import Base
 from database.models import STATUS_CANCELLED, STATUS_CONFIRMED, Appointment
 from tools.appointment_tools import (
     book_appointment,
     cancel_appointment,
     check_availability,
+    list_my_appointments,
     reschedule_appointment,
 )
 
@@ -114,6 +115,68 @@ def test_cancel_unknown_id_returns_error(db):
     assert "error" in cancel_appointment("NOPE1234", db)
 
 
-def test_full_day_has_all_slots(db):
+def test_full_day_has_all_doctor_slots(db):
+    """An empty day offers every slot inside the doctor's own hours."""
+    start, end = DOCTOR_HOURS[DOCTOR]
+    expected = [s for s in TIME_SLOTS if start <= s < end]
     avail = check_availability(DOCTOR, FUTURE, db)
-    assert avail["available_slots"] == TIME_SLOTS
+    assert avail["available_slots"] == expected
+    assert avail["consulting_hours"] == f"{start}–{end}"
+
+
+# ── Doctor working hours (Phase 7) ─────────────────────────
+
+def test_booking_outside_doctor_hours_rejected(db):
+    # Dr Rajesh Sharma consults 09:00 AM – 01:00 PM
+    assert DOCTOR_HOURS[DOCTOR] == ("09:00", "13:00")
+    result = book_appointment("Asha", DOCTOR, FUTURE, "14:00", db)
+    assert "error" in result and "consults between" in result["error"]
+    # in-hours booking still fine
+    assert book_appointment("Asha", DOCTOR, FUTURE, "12:30", db)["success"]
+
+
+def test_reschedule_outside_doctor_hours_rejected(db):
+    a = book_appointment("Asha", DOCTOR, FUTURE, "10:00", db)
+    moved = reschedule_appointment(a["appointment_id"], FUTURE, "16:00", db)
+    assert "error" in moved and "consults between" in moved["error"]
+
+
+def test_availability_never_offers_out_of_hours_slots(db):
+    avail = check_availability(DOCTOR, FUTURE, db)
+    assert "14:00" not in avail["available_slots"]
+    assert all(s < "13:00" for s in avail["available_slots"])
+
+
+# ── list_my_appointments + ownership (Phase 7) ─────────────
+
+def test_list_my_appointments_scopes_to_owner(db):
+    book_appointment("Asha", DOCTOR, FUTURE, "10:00", db, patient_uid="uid-asha")
+    book_appointment("Ravi", DOCTOR, FUTURE, "10:30", db, patient_uid="uid-ravi")
+
+    mine = list_my_appointments(db, patient_uid="uid-asha", patient_name="Asha")
+    assert mine["count"] == 1
+    assert mine["appointments"][0]["time"] == "10:00"
+
+
+def test_list_my_appointments_includes_legacy_name_rows(db):
+    book_appointment("Asha", DOCTOR, FUTURE, "10:00", db)  # no uid (legacy)
+    book_appointment("Asha", DOCTOR, FUTURE, "10:30", db, patient_uid="uid-asha")
+    mine = list_my_appointments(db, patient_uid="uid-asha", patient_name="Asha")
+    assert mine["count"] == 2
+
+
+def test_cancel_respects_ownership(db):
+    a = book_appointment("Asha", DOCTOR, FUTURE, "10:00", db, patient_uid="uid-asha")
+    # someone else's uid cannot cancel it
+    result = cancel_appointment(a["appointment_id"], db, patient_uid="uid-mallory")
+    assert "error" in result
+    # the owner can
+    assert cancel_appointment(a["appointment_id"], db, patient_uid="uid-asha")["success"]
+
+
+def test_reschedule_respects_ownership(db):
+    a = book_appointment("Asha", DOCTOR, FUTURE, "10:00", db, patient_uid="uid-asha")
+    stolen = reschedule_appointment(a["appointment_id"], FUTURE2, "11:00", db, patient_uid="uid-mallory")
+    assert "error" in stolen
+    moved = reschedule_appointment(a["appointment_id"], FUTURE2, "11:00", db, patient_uid="uid-asha")
+    assert moved["success"]

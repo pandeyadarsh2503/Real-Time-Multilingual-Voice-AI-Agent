@@ -74,6 +74,25 @@ DOCTORS = [
 
 DOCTOR_NAMES = [d["name"] for d in DOCTORS]
 
+
+def _parse_12h(t: str) -> str:
+    """'09:00 AM' → '09:00' (24h)."""
+    return datetime.strptime(t.strip(), "%I:%M %p").strftime("%H:%M")
+
+
+def _parse_availability(text: str) -> tuple[str, str]:
+    """'09:00 AM – 01:00 PM' → ('09:00', '13:00'). Accepts en-dash or hyphen."""
+    sep = "–" if "–" in text else "-"
+    start, end = text.split(sep, 1)
+    return _parse_12h(start), _parse_12h(end)
+
+
+# Structured per-doctor consulting windows, derived from the display
+# string so the card in the UI and the booking rules can never disagree.
+DOCTOR_HOURS: dict[str, tuple[str, str]] = {
+    d["name"]: _parse_availability(d["availability"]) for d in DOCTORS
+}
+
 CLINIC_START = "09:00"
 CLINIC_END   = "17:00"
 SLOT_DURATION = 30  # minutes
