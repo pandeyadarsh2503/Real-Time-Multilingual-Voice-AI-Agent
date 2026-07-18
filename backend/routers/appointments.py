@@ -1,14 +1,19 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import List, Optional
 
 from database.database import get_db
 from database.models import Appointment, BLOCKING_STATUSES, STATUS_CANCELLED
 from config import DOCTORS, clinic_today
+from services.auth_service import get_current_user, require_role, ROLE_PATIENT, ROLE_DOCTOR
 
 router = APIRouter()
+
+
+def _own_name(user: dict) -> str:
+    return user["name"] or user["email"]
 
 
 class AppointmentOut(BaseModel):
@@ -19,8 +24,7 @@ class AppointmentOut(BaseModel):
     time: str
     status: str
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 @router.get("/appointments", response_model=List[AppointmentOut])
@@ -30,12 +34,17 @@ def list_appointments(
     date_filter: Optional[str] = None,
     status: Optional[str] = None,
     db: Session = Depends(get_db),
+    user: dict = Depends(get_current_user),
 ):
     q = db.query(Appointment)
+    # Patients only ever see their own bookings, regardless of the
+    # filter they send; doctors/admins may query freely.
+    if user["role"] == ROLE_PATIENT:
+        q = q.filter(Appointment.patient_name == _own_name(user))
+    elif patient_name:
+        q = q.filter(Appointment.patient_name == patient_name)
     if doctor:
         q = q.filter(Appointment.doctor == doctor)
-    if patient_name:
-        q = q.filter(Appointment.patient_name == patient_name)
     if date_filter:
         q = q.filter(Appointment.date == date_filter)
     if status:
@@ -43,7 +52,7 @@ def list_appointments(
     return q.order_by(Appointment.date, Appointment.time).all()
 
 
-@router.get("/appointments/today")
+@router.get("/appointments/today", dependencies=[Depends(require_role(ROLE_DOCTOR))])
 def today_appointments(db: Session = Depends(get_db)):
     """Grouped by doctor — used by the frontend sidebar."""
     today_str = clinic_today().strftime("%Y-%m-%d")
@@ -66,6 +75,7 @@ def upcoming_appointments(
     limit: int = Query(5, ge=1, le=50),
     patient_name: Optional[str] = None,
     db: Session = Depends(get_db),
+    user: dict = Depends(get_current_user),
 ):
     """Next N active appointments from today onwards."""
     today_str = clinic_today().strftime("%Y-%m-%d")
@@ -73,7 +83,9 @@ def upcoming_appointments(
         Appointment.date >= today_str,
         Appointment.status.in_(BLOCKING_STATUSES),
     )
-    if patient_name:
+    if user["role"] == ROLE_PATIENT:
+        q = q.filter(Appointment.patient_name == _own_name(user))
+    elif patient_name:
         q = q.filter(Appointment.patient_name == patient_name)
 
     rows = q.order_by(Appointment.date, Appointment.time).limit(limit).all()
@@ -81,20 +93,29 @@ def upcoming_appointments(
 
 
 @router.get("/appointments/{appointment_id}", response_model=AppointmentOut)
-def get_appointment(appointment_id: str, db: Session = Depends(get_db)):
+def get_appointment(
+    appointment_id: str,
+    db: Session = Depends(get_db),
+    user: dict = Depends(get_current_user),
+):
     a = db.query(Appointment).filter(Appointment.id == appointment_id).first()
-    if not a:
+    if not a or (user["role"] == ROLE_PATIENT and a.patient_name != _own_name(user)):
+        # 404 (not 403) so appointment IDs can't be enumerated
         raise HTTPException(status_code=404, detail="Appointment not found")
     return a
 
 
 @router.delete("/appointments/{appointment_id}")
-def cancel_appointment_endpoint(appointment_id: str, db: Session = Depends(get_db)):
+def cancel_appointment_endpoint(
+    appointment_id: str,
+    db: Session = Depends(get_db),
+    user: dict = Depends(get_current_user),
+):
     a = db.query(Appointment).filter(
         Appointment.id == appointment_id,
         Appointment.status.in_(BLOCKING_STATUSES),
     ).first()
-    if not a:
+    if not a or (user["role"] == ROLE_PATIENT and a.patient_name != _own_name(user)):
         raise HTTPException(status_code=404, detail="Appointment not found or already cancelled")
     a.status = STATUS_CANCELLED
     try:
@@ -105,7 +126,7 @@ def cancel_appointment_endpoint(appointment_id: str, db: Session = Depends(get_d
     return {"message": f"Appointment {appointment_id} cancelled."}
 
 
-@router.get("/doctors")
+@router.get("/doctors", dependencies=[Depends(get_current_user)])
 def list_doctors():
     """Return list of available doctors from config."""
     return DOCTORS

@@ -36,10 +36,13 @@ def initiate_reminder_call(
         "CallerId":     settings.EXOTEL_CALLER_ID,
         "TimeLimit":    120,                              # max call duration (s)
         "Record":       "false",
-        "StatusCallback": "https://your-domain.ngrok.io/api/outbound/webhook",
         # Custom field passed through for webhook correlation
         "CustomField":  f"{patient_name}|{doctor}|{appt_date}|{appt_time}",
     }
+    if settings.EXOTEL_STATUS_CALLBACK_URL and settings.EXOTEL_WEBHOOK_TOKEN:
+        payload["StatusCallback"] = (
+            f"{settings.EXOTEL_STATUS_CALLBACK_URL}?token={settings.EXOTEL_WEBHOOK_TOKEN}"
+        )
 
     try:
         resp = requests.post(

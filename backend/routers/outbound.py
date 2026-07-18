@@ -6,12 +6,15 @@ from typing import Optional
 import logging
 import asyncio
 
-from config import clinic_today
+import hmac
+
+from config import clinic_today, settings
 from database.database import get_db
 from database.models import (
     Appointment, OutboundCampaign,
     BLOCKING_STATUSES, STATUS_CONFIRMED, STATUS_CANCELLED,
 )
+from services.auth_service import get_current_user
 from services.exotel_service import initiate_reminder_call
 from services.llm_service import generate_outbound_message
 
@@ -43,7 +46,7 @@ class PatientResponseRequest(BaseModel):
 
 
 # ── Live Exotel call ───────────────────────────────────────
-@router.post("/outbound/trigger")
+@router.post("/outbound/trigger", dependencies=[Depends(get_current_user)])
 async def trigger_call(req: TriggerRequest, db: Session = Depends(get_db)):
     appt = db.query(Appointment).filter(
         Appointment.id == req.appointment_id,
@@ -72,7 +75,7 @@ async def trigger_call(req: TriggerRequest, db: Session = Depends(get_db)):
 
 
 # ── Simulation mode (no Exotel needed) ────────────────────
-@router.post("/outbound/simulate")
+@router.post("/outbound/simulate", dependencies=[Depends(get_current_user)])
 async def simulate_reminder(req: SimulateRequest, db: Session = Depends(get_db)):
     """Returns the reminder payload the AI would speak — for demo/testing."""
     appt = db.query(Appointment).filter(Appointment.id == req.appointment_id).first()
@@ -103,7 +106,19 @@ async def simulate_reminder(req: SimulateRequest, db: Session = Depends(get_db))
 # ── Exotel webhook ─────────────────────────────────────────
 @router.post("/outbound/webhook")
 async def exotel_webhook(request: Request, db: Session = Depends(get_db)):
-    """Handles Exotel call-status callbacks (DTMF digit presses)."""
+    """
+    Handles Exotel call-status callbacks (DTMF digit presses).
+
+    Exotel cannot send our JWTs, so the callback URL carries a shared
+    secret (?token=...) which we compare in constant time. Without a
+    configured token the webhook is disabled outright.
+    """
+    if not settings.EXOTEL_WEBHOOK_TOKEN:
+        raise HTTPException(status_code=403, detail="Webhook is not configured.")
+    supplied = request.query_params.get("token", "")
+    if not hmac.compare_digest(supplied, settings.EXOTEL_WEBHOOK_TOKEN):
+        raise HTTPException(status_code=403, detail="Invalid webhook token.")
+
     form = await request.form()
     call_sid = form.get("CallSid", "")
     digits   = form.get("Digits", "")
@@ -133,7 +148,7 @@ async def exotel_webhook(request: Request, db: Session = Depends(get_db)):
 
 
 # ── Upcoming reminder list ─────────────────────────────────
-@router.get("/outbound/upcoming-reminders")
+@router.get("/outbound/upcoming-reminders", dependencies=[Depends(get_current_user)])
 def upcoming_reminders(db: Session = Depends(get_db)):
     """Returns tomorrow's appointments — candidates for reminder calls."""
     tomorrow = (clinic_today() + timedelta(days=1)).strftime("%Y-%m-%d")
@@ -155,7 +170,7 @@ def upcoming_reminders(db: Session = Depends(get_db)):
 
 
 # ── AI-generated outbound message ───────────────────────────
-@router.post("/outbound/generate-message")
+@router.post("/outbound/generate-message", dependencies=[Depends(get_current_user)])
 async def generate_message(req: GenerateMessageRequest):
     """
     Use the LLM to generate a short, multilingual spoken message
@@ -177,7 +192,7 @@ async def generate_message(req: GenerateMessageRequest):
 
 
 # ── Handle patient call response ────────────────────────────
-@router.post("/outbound/respond")
+@router.post("/outbound/respond", dependencies=[Depends(get_current_user)])
 async def handle_patient_response(
     req: PatientResponseRequest,
     db: Session = Depends(get_db),
@@ -248,7 +263,7 @@ async def _delayed_call(
     )
 
 
-@router.post("/outbound/trigger-demo")
+@router.post("/outbound/trigger-demo", dependencies=[Depends(get_current_user)])
 async def trigger_demo_call(req: TriggerDemoRequest, background_tasks: BackgroundTasks):
     """
     Schedule a live Exotel reminder call for demo purposes.

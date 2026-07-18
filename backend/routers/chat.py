@@ -1,10 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
 from typing import Optional
 import logging
 
+from core.rate_limit import limiter
 from database.database import get_db
+from services.auth_service import get_current_user
 from services.llm_service import run_agent
 from services.memory_service import (
     get_session, append_to_session, replace_session, persist_text,
@@ -23,6 +25,8 @@ router = APIRouter()
 class ChatRequest(BaseModel):
     message: str = Field(..., min_length=1, max_length=2000)
     session_id: str = Field(..., min_length=1, max_length=64)
+    # Kept for backward compatibility; identity now comes from the
+    # verified Firebase token, never from the client payload.
     patient_name: Optional[str] = Field(None, max_length=120)
     language: Optional[str] = None   # client-detected lang hint
 
@@ -34,26 +38,37 @@ class ChatResponse(BaseModel):
 
 
 @router.post("/chat", response_model=ChatResponse)
-async def chat(req: ChatRequest, db: Session = Depends(get_db)):
+@limiter.limit("20/minute")
+async def chat(
+    request: Request,
+    req: ChatRequest,
+    db: Session = Depends(get_db),
+    user: dict = Depends(get_current_user),
+):
+    # Identity is server-derived from the verified token.
+    patient_name = user["name"] or user["email"] or None
     try:
         # 1. Language detection
         lang = req.language or detect_language_from_text(req.message)
 
         # 2. Build user message, optionally injecting patient memory
         user_text = req.message
-        if req.patient_name:
-            mem = get_patient_memory(req.patient_name, db)
+        if patient_name:
+            mem = get_patient_memory(patient_name, db)
             if mem and mem.get("preferred_doctor"):
                 user_text += (
-                    f"\n[Patient memory: {req.patient_name} "
+                    f"\n[Patient memory: {patient_name} "
                     f"usually sees {mem['preferred_doctor']}, "
                     f"preferred language: {mem.get('language', 'en')}]"
                 )
 
-        # 3. Load live session and append new user turn
-        get_session(req.session_id, db)  # seeds from DB on first access
-        append_to_session(req.session_id, {"role": "user", "content": user_text})
-        persist_text(req.session_id, "user", req.message, db)
+        # 3. Load live session and append new user turn.
+        # Session keys are scoped to the authenticated uid so one user
+        # can never read or continue another user's conversation.
+        session_key = f"{user['uid']}:{req.session_id}"
+        get_session(session_key, db)  # seeds from DB on first access
+        append_to_session(session_key, {"role": "user", "content": user_text})
+        persist_text(session_key, "user", req.message, db)
 
         # 4. Tool executor closure (captures db + patient name)
         REQUIRED_ARGS = {
@@ -78,8 +93,8 @@ async def chat(req: ChatRequest, db: Session = Depends(get_db)):
                 result = book_appointment(
                     args["name"], args["doctor"], args["date"], args["time"], db
                 )
-                if result.get("success") and req.patient_name:
-                    update_patient_memory(req.patient_name, {
+                if result.get("success") and patient_name:
+                    update_patient_memory(patient_name, {
                         "preferred_doctor": args["doctor"],
                         "language": lang,
                         "last_appointment_id": result.get("appointment_id"),
@@ -94,14 +109,14 @@ async def chat(req: ChatRequest, db: Session = Depends(get_db)):
             return cancel_appointment(args["appointment_id"], db)
 
         # 5. Run LLM agent
-        current_messages = get_session(req.session_id, db)
+        current_messages = get_session(session_key, db)
         response_text, updated = await run_agent(current_messages, tool_executor)
 
         # 6. Replace session with updated messages (tool calls included)
-        replace_session(req.session_id, updated)
+        replace_session(session_key, updated)
 
         # 7. Persist assistant reply
-        persist_text(req.session_id, "assistant", response_text, db)
+        persist_text(session_key, "assistant", response_text, db)
 
         return ChatResponse(
             response=response_text,

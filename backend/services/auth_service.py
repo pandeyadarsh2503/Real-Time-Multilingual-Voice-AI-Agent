@@ -1,0 +1,134 @@
+"""
+Firebase Authentication for the backend.
+
+Verifies Firebase ID tokens (RS256 JWTs) against Google's public
+securetoken certificates — no service-account key or firebase-admin
+SDK required, so this works on the free Spark plan and in any
+container with outbound HTTPS.
+
+Flow:  frontend obtains an ID token from the Firebase JS SDK and sends
+       `Authorization: Bearer <token>`; we verify signature, audience
+       (project id), issuer, and expiry, then expose the user to route
+       handlers via the `get_current_user` dependency.
+"""
+import logging
+import re
+import threading
+import time
+
+import jwt
+import requests
+from cryptography.x509 import load_pem_x509_certificate
+from fastapi import Depends, HTTPException, Request
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+
+from config import settings
+
+logger = logging.getLogger(__name__)
+
+GOOGLE_CERTS_URL = (
+    "https://www.googleapis.com/robot/v1/metadata/x509/"
+    "securetoken@system.gserviceaccount.com"
+)
+
+ROLE_PATIENT = "patient"
+ROLE_DOCTOR  = "doctor"
+ROLE_ADMIN   = "admin"
+
+_bearer = HTTPBearer(auto_error=False)
+
+# ── Google public-cert cache (refreshed per Cache-Control max-age) ──
+_certs_lock = threading.Lock()
+_certs: dict[str, str] = {}
+_certs_expiry: float = 0.0
+
+
+def _get_certs() -> dict[str, str]:
+    global _certs, _certs_expiry
+    with _certs_lock:
+        if _certs and time.time() < _certs_expiry:
+            return _certs
+        resp = requests.get(GOOGLE_CERTS_URL, timeout=10)
+        resp.raise_for_status()
+        _certs = resp.json()
+        max_age = 3600
+        m = re.search(r"max-age=(\d+)", resp.headers.get("Cache-Control", ""))
+        if m:
+            max_age = int(m.group(1))
+        _certs_expiry = time.time() + max_age
+        return _certs
+
+
+def verify_firebase_token(token: str) -> dict:
+    """Verify a Firebase ID token. Returns the decoded claims or raises 401."""
+    project_id = settings.FIREBASE_PROJECT_ID
+    if not project_id:
+        # Misconfiguration is a server problem, not the caller's.
+        logger.error("FIREBASE_PROJECT_ID is not set — cannot verify tokens.")
+        raise HTTPException(status_code=503, detail="Authentication is not configured.")
+
+    try:
+        kid = jwt.get_unverified_header(token).get("kid")
+        certs = _get_certs()
+        if kid not in certs:
+            raise jwt.InvalidTokenError("Unknown key id")
+        public_key = load_pem_x509_certificate(certs[kid].encode()).public_key()
+        claims = jwt.decode(
+            token,
+            key=public_key,
+            algorithms=["RS256"],
+            audience=project_id,
+            issuer=f"https://securetoken.google.com/{project_id}",
+        )
+    except HTTPException:
+        raise
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token has expired. Please sign in again.")
+    except Exception as exc:
+        logger.warning(f"Token verification failed: {exc}")
+        raise HTTPException(status_code=401, detail="Invalid authentication token.")
+
+    if not claims.get("sub"):
+        raise HTTPException(status_code=401, detail="Invalid authentication token.")
+    return claims
+
+
+async def get_current_user(
+    request: Request,
+    creds: HTTPAuthorizationCredentials | None = Depends(_bearer),
+) -> dict:
+    """
+    FastAPI dependency: the authenticated user for this request.
+    Returns {uid, name, email, role}.
+    """
+    if settings.AUTH_DISABLED:
+        # Explicit opt-out for local development / CI without Firebase.
+        return {"uid": "dev-user", "name": "Dev User", "email": "dev@local", "role": ROLE_ADMIN}
+
+    if creds is None or creds.scheme.lower() != "bearer":
+        raise HTTPException(
+            status_code=401,
+            detail="Not authenticated.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    claims = verify_firebase_token(creds.credentials)
+    user = {
+        "uid":   claims["sub"],
+        "name":  claims.get("name") or "",
+        "email": claims.get("email") or "",
+        # Role comes from Firebase custom claims; everyone is a patient
+        # unless explicitly promoted (see docs/auth section in README).
+        "role":  claims.get("role", ROLE_PATIENT),
+    }
+    request.state.user = user
+    return user
+
+
+def require_role(*roles: str):
+    """Dependency factory: allow only the given roles (admins always pass)."""
+    async def _checker(user: dict = Depends(get_current_user)) -> dict:
+        if user["role"] not in roles and user["role"] != ROLE_ADMIN:
+            raise HTTPException(status_code=403, detail="Insufficient permissions.")
+        return user
+    return _checker

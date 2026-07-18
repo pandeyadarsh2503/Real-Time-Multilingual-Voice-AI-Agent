@@ -16,6 +16,13 @@ class Settings(BaseSettings):
     TTS_PROVIDER: str = "azure"
     CLINIC_TIMEZONE: str = "Asia/Kolkata"
 
+    # ── Auth & security ───────────────────────────────────
+    FIREBASE_PROJECT_ID: str = ""
+    AUTH_DISABLED: bool = False          # dev/CI escape hatch — never enable in production
+    ALLOWED_ORIGINS: str = "http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000"
+    EXOTEL_WEBHOOK_TOKEN: str = ""       # shared secret appended to the webhook URL
+    EXOTEL_STATUS_CALLBACK_URL: str = "" # public URL Exotel posts call status to
+
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 

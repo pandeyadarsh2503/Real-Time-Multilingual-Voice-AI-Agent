@@ -1,8 +1,20 @@
 import axios from 'axios'
+import { auth } from '../firebase'
 
 const api = axios.create({
   baseURL: '/api',
   timeout: 30000,
+})
+
+// Attach the Firebase ID token to every request. The SDK caches the
+// token and refreshes it automatically when it nears expiry.
+api.interceptors.request.use(async (config) => {
+  const user = auth.currentUser
+  if (user) {
+    const token = await user.getIdToken()
+    config.headers.Authorization = `Bearer ${token}`
+  }
+  return config
 })
 
 // ── Chat ───────────────────────────────────────────────────

@@ -2,15 +2,17 @@ import asyncio
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File, Form
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
+from core.rate_limit import limiter
+from services.auth_service import get_current_user
 from services.stt_service import transcribe
 from services.tts_service import synthesize_speech
 
 logger = logging.getLogger(__name__)
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(get_current_user)])
 
 MAX_AUDIO_BYTES = 10 * 1024 * 1024   # 10 MB ≈ several minutes of webm/opus
 MAX_TTS_CHARS   = 1000
@@ -18,7 +20,9 @@ MAX_TTS_CHARS   = 1000
 
 # ── STT endpoint ───────────────────────────────────────────
 @router.post("/voice/stt")
+@limiter.limit("30/minute")
 async def speech_to_text(
+    request: Request,
     audio: UploadFile = File(...),
     language_hint: Optional[str] = Form(None),
 ):
@@ -46,7 +50,8 @@ class TTSRequest(BaseModel):
 
 
 @router.post("/voice/tts")
-async def text_to_speech(req: TTSRequest):
+@limiter.limit("40/minute")
+async def text_to_speech(request: Request, req: TTSRequest):
     """
     Accept text + language code → return MP3 audio bytes.
     """
