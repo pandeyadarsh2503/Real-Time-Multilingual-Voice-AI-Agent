@@ -2,8 +2,7 @@ import asyncio
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File, Form
-from fastapi.responses import Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, UploadFile, File, Form
 from pydantic import BaseModel, Field
 
 from core.rate_limit import limiter
@@ -23,6 +22,7 @@ MAX_TTS_CHARS   = 1000
 @limiter.limit("30/minute")
 async def speech_to_text(
     request: Request,
+    response: Response,   # slowapi injects X-RateLimit headers here
     audio: UploadFile = File(...),
     language_hint: Optional[str] = Form(None),
 ):

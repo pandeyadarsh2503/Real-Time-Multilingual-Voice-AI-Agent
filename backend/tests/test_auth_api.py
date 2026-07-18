@@ -133,3 +133,24 @@ def test_today_view_requires_doctor_role(client):
 def test_webhook_requires_shared_token(client):
     resp = client.post("/api/outbound/webhook", data={"CallSid": "x"})
     assert resp.status_code == 403
+
+
+def test_authorized_chat_success_path_with_rate_limit_headers(client, monkeypatch):
+    """
+    Regression: rate-limited endpoints returning Pydantic models used to
+    crash on SUCCESSFUL calls because slowapi had no Response object to
+    inject its headers into (only 401/429 paths had been exercised).
+    """
+    import routers.chat as chat_module
+
+    async def fake_agent(messages, tool_executor, max_iter=6):
+        return "Hello! How can I help?", messages + [
+            {"role": "assistant", "content": "Hello! How can I help?"}
+        ]
+
+    monkeypatch.setattr(chat_module, "run_agent", fake_agent)
+    login_as(PATIENT_ASHA)
+    resp = client.post("/api/chat", json={"message": "hi", "session_id": "s-reg"})
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["response"] == "Hello! How can I help?"
+    assert "x-ratelimit-limit" in {k.lower() for k in resp.headers}

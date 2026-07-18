@@ -16,6 +16,11 @@ class Settings(BaseSettings):
     TTS_PROVIDER: str = "azure"
     CLINIC_TIMEZONE: str = "Asia/Kolkata"
 
+    # ── Memory / Redis ────────────────────────────────────
+    REDIS_URL: str = ""                  # e.g. rediss://default:<pass>@<host>:6379 (Upstash)
+    SESSION_TTL_SECONDS: int = 1800      # sliding TTL for live conversations
+    MEMORY_RETENTION_DAYS: int = 30      # persisted transcript retention
+
     # ── Auth & security ───────────────────────────────────
     FIREBASE_PROJECT_ID: str = ""
     AUTH_DISABLED: bool = False          # dev/CI escape hatch — never enable in production

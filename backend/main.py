@@ -25,6 +25,15 @@ async def lifespan(app: FastAPI):
     # ── Startup ────────────────────────────────────────────
     run_startup_migrations()
     logger.info("✅ Database schema created / verified.")
+    try:
+        from database.database import SessionLocal
+        from services.memory_service import prune_old_memory
+        with SessionLocal() as db:
+            deleted = prune_old_memory(db)
+        if deleted:
+            logger.info(f"🧹 Pruned {deleted} persisted memory rows past retention.")
+    except Exception:
+        logger.exception("Memory retention pruning failed (non-fatal).")
     if settings.AUTH_DISABLED:
         logger.warning("⚠️  AUTH_DISABLED=true — API is running WITHOUT authentication.")
     elif not settings.FIREBASE_PROJECT_ID:

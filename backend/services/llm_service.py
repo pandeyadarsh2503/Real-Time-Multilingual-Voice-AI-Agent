@@ -272,6 +272,37 @@ async def run_agent(messages: list, tool_executor, max_iter: int = 6) -> tuple[s
     return "I'm sorry, I couldn't complete that action. Please try again.", msgs
 
 
+# ── Conversation Summarizer (context compression) ──────────
+SUMMARY_PROMPT = """\
+Summarize this clinic-assistant conversation in 3-5 short factual
+sentences. Preserve exactly: patient name, doctors discussed, dates,
+times, appointment IDs, booking/cancellation outcomes, and stated
+preferences. No filler, no commentary."""
+
+
+async def summarize_conversation(messages: list) -> str:
+    """Condense older turns into a short factual summary for the prompt."""
+    transcript = "\n".join(
+        f"{m.get('role')}: {m.get('content')}"
+        for m in messages
+        if m.get("role") in ("user", "assistant") and m.get("content")
+    )
+    if not transcript:
+        return ""
+
+    response = await asyncio.to_thread(
+        client.chat.completions.create,
+        model=GROQ_MODEL,
+        messages=[
+            {"role": "system", "content": SUMMARY_PROMPT},
+            {"role": "user", "content": transcript[-6000:]},
+        ],
+        max_tokens=200,
+        temperature=0.1,
+    )
+    return (response.choices[0].message.content or "").strip()
+
+
 # ── Outbound Call Message Generator ────────────────────────
 async def generate_outbound_message(
     name: str,

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
 from typing import Optional
@@ -7,9 +7,10 @@ import logging
 from core.rate_limit import limiter
 from database.database import get_db
 from services.auth_service import get_current_user
-from services.llm_service import run_agent
+from services.llm_service import run_agent, summarize_conversation
 from services.memory_service import (
     get_session, append_to_session, replace_session, persist_text,
+    compress_session_messages,
     get_patient_memory, update_patient_memory,
 )
 from services.stt_service import detect_language_from_text
@@ -41,6 +42,7 @@ class ChatResponse(BaseModel):
 @limiter.limit("20/minute")
 async def chat(
     request: Request,
+    response: Response,   # slowapi injects X-RateLimit headers here
     req: ChatRequest,
     db: Session = Depends(get_db),
     user: dict = Depends(get_current_user),
@@ -66,8 +68,7 @@ async def chat(
         # Session keys are scoped to the authenticated uid so one user
         # can never read or continue another user's conversation.
         session_key = f"{user['uid']}:{req.session_id}"
-        get_session(session_key, db)  # seeds from DB on first access
-        append_to_session(session_key, {"role": "user", "content": user_text})
+        await append_to_session(session_key, {"role": "user", "content": user_text}, db)
         persist_text(session_key, "user", req.message, db)
 
         # 4. Tool executor closure (captures db + patient name)
@@ -110,11 +111,13 @@ async def chat(
             return cancel_appointment(args["appointment_id"], db)
 
         # 5. Run LLM agent
-        current_messages = get_session(session_key, db)
+        current_messages = await get_session(session_key, db)
         response_text, updated = await run_agent(current_messages, tool_executor)
 
-        # 6. Replace session with updated messages (tool calls included)
-        replace_session(session_key, updated)
+        # 6. Compress long histories into a summary, then store the
+        #    updated transcript (tool calls included)
+        updated = await compress_session_messages(updated, summarize_conversation)
+        await replace_session(session_key, updated)
 
         # 7. Persist assistant reply
         persist_text(session_key, "assistant", response_text, db)

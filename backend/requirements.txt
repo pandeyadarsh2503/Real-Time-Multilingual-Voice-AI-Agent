@@ -18,3 +18,4 @@ cryptography==42.0.8
 slowapi==0.1.9
 alembic==1.13.1
 psycopg2-binary==2.9.9
+redis==5.0.4
