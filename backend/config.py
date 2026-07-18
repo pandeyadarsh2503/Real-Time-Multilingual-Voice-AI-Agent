@@ -28,6 +28,11 @@ class Settings(BaseSettings):
     SESSION_TTL_SECONDS: int = 1800      # sliding TTL for live conversations
     MEMORY_RETENTION_DAYS: int = 30      # persisted transcript retention
 
+    # ── Temporal (durable workflows) ──────────────────────
+    TEMPORAL_ADDRESS: str = ""           # e.g. localhost:7233; empty = in-process fallback
+    TEMPORAL_NAMESPACE: str = "default"
+    TEMPORAL_TASK_QUEUE: str = "swasthya-reminders"
+
     # ── Auth & security ───────────────────────────────────
     FIREBASE_PROJECT_ID: str = ""
     AUTH_DISABLED: bool = False          # dev/CI escape hatch — never enable in production

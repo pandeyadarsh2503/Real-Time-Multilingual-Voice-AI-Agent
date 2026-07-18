@@ -37,6 +37,65 @@ services:
       backend:
         condition: service_healthy
 
+  # ── Temporal (durable reminder workflows) ────────────────
+  # Optional stack: docker compose --profile temporal up
+  # Set TEMPORAL_ADDRESS=temporal:7233 in backend/.env to use it.
+  temporal-db:
+    image: postgres:16-alpine
+    container_name: swasthyaai-temporal-db
+    profiles: ["temporal"]
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: temporal
+      POSTGRES_PASSWORD: temporal
+    volumes:
+      - temporal_db_data:/var/lib/postgresql/data
+
+  temporal:
+    image: temporalio/auto-setup:1.24.2
+    container_name: swasthyaai-temporal
+    profiles: ["temporal"]
+    restart: unless-stopped
+    depends_on:
+      - temporal-db
+    environment:
+      DB: postgres12
+      DB_PORT: "5432"
+      POSTGRES_USER: temporal
+      POSTGRES_PWD: temporal
+      POSTGRES_SEEDS: temporal-db
+    ports:
+      - "7233:7233"
+
+  temporal-ui:
+    image: temporalio/ui:2.26.2
+    container_name: swasthyaai-temporal-ui
+    profiles: ["temporal"]
+    restart: unless-stopped
+    depends_on:
+      - temporal
+    environment:
+      TEMPORAL_ADDRESS: temporal:7233
+    ports:
+      - "8080:8080"
+
+  temporal-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: swasthyaai-temporal-worker
+    profiles: ["temporal"]
+    restart: unless-stopped
+    command: ["python", "worker.py"]
+    env_file:
+      - ./backend/.env
+    environment:
+      - TEMPORAL_ADDRESS=temporal:7233
+    depends_on:
+      - temporal
+
 volumes:
   db_data:
+    driver: local
+  temporal_db_data:
     driver: local

@@ -1,9 +1,8 @@
-import asyncio
 import hmac
 import logging
 from datetime import timedelta
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -19,6 +18,7 @@ from database.models import (
 from services.auth_service import get_current_user
 from services.exotel_service import initiate_reminder_call
 from services.llm_service import generate_outbound_message
+from services.scheduler_service import schedule_reminder
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -244,45 +244,22 @@ class TriggerDemoRequest(BaseModel):
     language: str = "English"
 
 
-async def _delayed_call(
-    phone: str,
-    patient_name: str,
-    doctor: str,
-    appt_date: str,
-    appt_time: str,
-    delay_minutes: int,
-    language: str,
-):
-    """Wait `delay_minutes` then fire the Exotel call."""
-    await asyncio.sleep(delay_minutes * 60)
-    logger.info(f"Demo trigger: calling {phone} for {patient_name} after {delay_minutes}m")
-    initiate_reminder_call(
-        phone=phone,
-        patient_name=patient_name,
-        doctor=doctor,
-        appt_date=appt_date,
-        appt_time=appt_time,
-    )
-
-
 @router.post("/outbound/trigger-demo", dependencies=[Depends(get_current_user)])
-async def trigger_demo_call(req: TriggerDemoRequest, background_tasks: BackgroundTasks):
+async def trigger_demo_call(req: TriggerDemoRequest):
     """
-    Schedule a live Exotel reminder call for demo purposes.
-    The call fires after `delay_minutes` without needing a DB appointment.
-    The AI will ask if the patient is available with the specified doctor.
-    """
-    if not req.phone:
-        raise HTTPException(status_code=400, detail="Phone number is required")
+    Schedule a reminder call after `delay_minutes`.
 
-    background_tasks.add_task(
-        _delayed_call,
+    Durable (Temporal workflow with retries and a persisted timer) when
+    TEMPORAL_ADDRESS is configured; otherwise falls back to an
+    in-process timer that is explicitly best-effort.
+    """
+    result = await schedule_reminder(
         phone=req.phone,
         patient_name=req.patient_name,
         doctor=req.doctor,
-        appt_date=req.date,
-        appt_time=req.time,
-        delay_minutes=req.delay_minutes,
+        date=req.date,
+        time=req.time,
+        delay_seconds=req.delay_minutes * 60,
         language=req.language,
     )
 
@@ -292,4 +269,6 @@ async def trigger_demo_call(req: TriggerDemoRequest, background_tasks: Backgroun
         "delay_minutes": req.delay_minutes,
         "phone": req.phone,
         "doctor": req.doctor,
+        "scheduler": result["scheduler"],
+        "workflow_id": result["workflow_id"],
     }
