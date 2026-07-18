@@ -2,9 +2,34 @@ from datetime import datetime, date
 from typing import Optional
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
-from database.models import Appointment
-from config import TIME_SLOTS, DOCTOR_NAMES
+from database.models import (
+    Appointment,
+    BLOCKING_STATUSES,
+    STATUS_SCHEDULED,
+    STATUS_CANCELLED,
+)
+from config import TIME_SLOTS, DOCTOR_NAMES, clinic_now, clinic_today
 import uuid
+
+
+def _parse_date(date_str: str) -> Optional[date]:
+    try:
+        return datetime.strptime(date_str, "%Y-%m-%d").date()
+    except ValueError:
+        return None
+
+
+def _slot_in_past(appt_date: date, time_str: str) -> bool:
+    """True if the slot is today (clinic time) and already elapsed."""
+    if appt_date != clinic_today():
+        return False
+    slot_time = datetime.strptime(time_str, "%H:%M").time()
+    return slot_time <= clinic_now().time()
+
+
+def _suggest_slots(doctor: str, date_str: str, db: Session, limit: int = 3) -> list:
+    avail = check_availability(doctor, date_str, db)
+    return avail.get("available_slots", [])[:limit]
 
 
 def check_availability(doctor: str, date_str: str, db: Session) -> dict:
@@ -14,31 +39,24 @@ def check_availability(doctor: str, date_str: str, db: Session) -> dict:
             "error": f"Doctor '{doctor}' not found.",
             "available_doctors": DOCTOR_NAMES,
         }
-    try:
-        appt_date = datetime.strptime(date_str, "%Y-%m-%d").date()
-    except ValueError:
+    appt_date = _parse_date(date_str)
+    if appt_date is None:
         return {"error": "Invalid date format. Please use YYYY-MM-DD."}
 
-    today = date.today()
-    if appt_date < today:
+    if appt_date < clinic_today():
         return {"error": "Cannot check availability for past dates."}
 
     booked = db.query(Appointment).filter(
         Appointment.doctor == doctor,
         Appointment.date   == date_str,
-        Appointment.status == "scheduled",
+        Appointment.status.in_(BLOCKING_STATUSES),
     ).all()
     booked_times = {a.time for a in booked}
 
-    now = datetime.now()
-    available = []
-    for slot in TIME_SLOTS:
-        if appt_date == today:
-            slot_dt = datetime.combine(today, datetime.strptime(slot, "%H:%M").time())
-            if slot_dt <= now:
-                continue
-        if slot not in booked_times:
-            available.append(slot)
+    available = [
+        slot for slot in TIME_SLOTS
+        if slot not in booked_times and not _slot_in_past(appt_date, slot)
+    ]
 
     return {
         "doctor": doctor,
@@ -53,41 +71,34 @@ def book_appointment(name: str, doctor: str, date_str: str, time_str: str, db: S
     if doctor not in DOCTOR_NAMES:
         return {"error": f"Doctor '{doctor}' not found. Available: {', '.join(DOCTOR_NAMES)}"}
 
-    try:
-        appt_date = datetime.strptime(date_str, "%Y-%m-%d").date()
-    except ValueError:
+    appt_date = _parse_date(date_str)
+    if appt_date is None:
         return {"error": "Invalid date format. Use YYYY-MM-DD."}
 
-    today = date.today()
-    if appt_date < today:
+    if appt_date < clinic_today():
         return {"error": "Cannot book appointments in the past."}
 
     if time_str not in TIME_SLOTS:
         return {"error": f"'{time_str}' is not a valid slot. Valid slots: {', '.join(TIME_SLOTS)}"}
 
-    if appt_date == today:
-        slot_dt = datetime.combine(today, datetime.strptime(time_str, "%H:%M").time())
-        if slot_dt <= datetime.now():
-            return {"error": "This time slot has already passed for today."}
+    if _slot_in_past(appt_date, time_str):
+        return {"error": "This time slot has already passed for today."}
 
     # ── Pessimistic lock: SELECT ... FOR UPDATE ───────────────
-    # Locks the matching row(s) so a concurrent transaction that has
-    # already found this slot 'free' cannot commit until we finish.
-    # On SQLite this gracefully degrades to a standard SELECT because
-    # SQLite serialises writes at the file level.
+    # Real row lock on PostgreSQL; a plain SELECT on SQLite (which
+    # serialises writes at the file level). The partial unique index
+    # uq_active_slot is the authoritative guard either way.
     conflict = db.query(Appointment).filter(
         Appointment.doctor == doctor,
         Appointment.date   == date_str,
         Appointment.time   == time_str,
-        Appointment.status == "scheduled",
+        Appointment.status.in_(BLOCKING_STATUSES),
     ).with_for_update().first()
 
     if conflict:
-        avail = check_availability(doctor, date_str, db)
-        suggested = avail.get("available_slots", [])[:3]
         return {
             "error": f"Slot {time_str} is already booked for {doctor} on {date_str}.",
-            "suggested_slots": suggested,
+            "suggested_slots": _suggest_slots(doctor, date_str, db),
         }
 
     appt_id = str(uuid.uuid4())[:8].upper()
@@ -97,23 +108,19 @@ def book_appointment(name: str, doctor: str, date_str: str, time_str: str, db: S
         doctor=doctor,
         date=date_str,
         time=time_str,
-        status="scheduled",
+        status=STATUS_SCHEDULED,
     )
     try:
         db.add(appt)
         db.commit()
         db.refresh(appt)
     except IntegrityError:
-        # ── Second-layer defence ───────────────────────────────
-        # Triggered when two concurrent requests both passed the lock
-        # check (possible on SQLite which lacks true row-level locking)
-        # and the DB UniqueConstraint fires on the second INSERT.
+        # Two concurrent requests both passed the availability check;
+        # the DB index rejected the second INSERT.
         db.rollback()
-        avail = check_availability(doctor, date_str, db)
-        suggested = avail.get("available_slots", [])[:3]
         return {
             "error": f"Slot {time_str} was just booked by another request. Please choose a different time.",
-            "suggested_slots": suggested,
+            "suggested_slots": _suggest_slots(doctor, date_str, db),
         }
 
     return {
@@ -123,52 +130,46 @@ def book_appointment(name: str, doctor: str, date_str: str, time_str: str, db: S
         "doctor": doctor,
         "date": date_str,
         "time": time_str,
-        "status": "scheduled",
+        "status": STATUS_SCHEDULED,
         "message": f"Appointment booked! ID: {appt_id}",
     }
 
 
 def reschedule_appointment(appointment_id: str, new_date: str, new_time: str, db: Session) -> dict:
-    """Move an existing scheduled appointment to a new slot."""
+    """Move an existing active appointment to a new slot."""
     appt = db.query(Appointment).filter(
-        Appointment.id     == appointment_id,
-        Appointment.status == "scheduled",
+        Appointment.id == appointment_id,
+        Appointment.status.in_(BLOCKING_STATUSES),
     ).first()
 
     if not appt:
         return {"error": f"Appointment '{appointment_id}' not found or already cancelled."}
 
-    try:
-        new_date_obj = datetime.strptime(new_date, "%Y-%m-%d").date()
-    except ValueError:
+    new_date_obj = _parse_date(new_date)
+    if new_date_obj is None:
         return {"error": "Invalid date format. Use YYYY-MM-DD."}
 
-    if new_date_obj < date.today():
+    if new_date_obj < clinic_today():
         return {"error": "Cannot reschedule to a past date."}
 
     if new_time not in TIME_SLOTS:
         return {"error": f"'{new_time}' is not a valid slot."}
 
-    if new_date_obj == date.today():
-        slot_dt = datetime.combine(date.today(), datetime.strptime(new_time, "%H:%M").time())
-        if slot_dt <= datetime.now():
-            return {"error": "This time slot has already passed for today."}
+    if _slot_in_past(new_date_obj, new_time):
+        return {"error": "This time slot has already passed for today."}
 
-    # ── Pessimistic lock: SELECT ... FOR UPDATE ───────────────
     conflict = db.query(Appointment).filter(
         Appointment.doctor == appt.doctor,
         Appointment.date   == new_date,
         Appointment.time   == new_time,
-        Appointment.status == "scheduled",
+        Appointment.status.in_(BLOCKING_STATUSES),
         Appointment.id     != appointment_id,
     ).with_for_update().first()
 
     if conflict:
-        avail = check_availability(appt.doctor, new_date, db)
-        suggested = avail.get("available_slots", [])[:3]
         return {
             "error": f"Slot {new_time} on {new_date} is already booked.",
-            "suggested_slots": suggested,
+            "suggested_slots": _suggest_slots(appt.doctor, new_date, db),
         }
 
     old_date, old_time = appt.date, appt.time
@@ -178,11 +179,9 @@ def reschedule_appointment(appointment_id: str, new_date: str, new_time: str, db
         db.commit()
     except IntegrityError:
         db.rollback()
-        avail = check_availability(appt.doctor, new_date, db)
-        suggested = avail.get("available_slots", [])[:3]
         return {
             "error": f"Slot {new_time} on {new_date} was just taken. Please pick another time.",
-            "suggested_slots": suggested,
+            "suggested_slots": _suggest_slots(appt.doctor, new_date, db),
         }
 
     return {
@@ -198,17 +197,21 @@ def reschedule_appointment(appointment_id: str, new_date: str, new_time: str, db
 
 
 def cancel_appointment(appointment_id: str, db: Session) -> dict:
-    """Cancel a scheduled appointment."""
+    """Cancel an active (scheduled or confirmed) appointment."""
     appt = db.query(Appointment).filter(
-        Appointment.id     == appointment_id,
-        Appointment.status == "scheduled",
+        Appointment.id == appointment_id,
+        Appointment.status.in_(BLOCKING_STATUSES),
     ).first()
 
     if not appt:
         return {"error": f"Appointment '{appointment_id}' not found or already cancelled."}
 
-    appt.status = "cancelled"
-    db.commit()
+    appt.status = STATUS_CANCELLED
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        return {"error": "Could not cancel the appointment. Please try again."}
 
     return {
         "success": True,

@@ -1,11 +1,22 @@
 import uuid
-from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey, UniqueConstraint
+from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey, Index
 from sqlalchemy.sql import func
 from .database import Base
 
 
 def _new_id():
     return str(uuid.uuid4())[:8].upper()
+
+
+# ── Appointment status lifecycle ───────────────────────────
+STATUS_SCHEDULED = "scheduled"
+STATUS_CONFIRMED = "confirmed"   # patient confirmed via outbound call
+STATUS_CANCELLED = "cancelled"
+STATUS_COMPLETED = "completed"
+
+# Statuses that occupy a slot. Every availability / conflict query
+# must use this set — a confirmed appointment still blocks its slot.
+BLOCKING_STATUSES = (STATUS_SCHEDULED, STATUS_CONFIRMED)
 
 
 class Appointment(Base):
@@ -16,18 +27,22 @@ class Appointment(Base):
     doctor       = Column(String, nullable=False)
     date         = Column(String, nullable=False)   # YYYY-MM-DD
     time         = Column(String, nullable=False)   # HH:MM (24h)
-    status       = Column(String, default="scheduled")  # scheduled | cancelled | completed
+    status       = Column(String, default=STATUS_SCHEDULED)
     created_at   = Column(DateTime, server_default=func.now())
 
     # ── Race-condition guard ───────────────────────────────
-    # Enforces at the DB layer that no two *scheduled* appointments
-    # can exist for the same doctor + date + time combination.
-    # This prevents double-booking even if two concurrent requests
-    # both pass the application-level availability check.
+    # Partial unique index: at most ONE active (scheduled/confirmed)
+    # appointment per doctor + date + time. Cancelled/completed rows
+    # are excluded, so re-booking and re-cancelling a slot can never
+    # trip the constraint (the old 4-column UNIQUE that included
+    # `status` made the *second* cancellation of a slot crash).
     __table_args__ = (
-        UniqueConstraint(
-            "doctor", "date", "time", "status",
-            name="uq_scheduled_slot",
+        Index(
+            "uq_active_slot",
+            "doctor", "date", "time",
+            unique=True,
+            sqlite_where=status.in_(BLOCKING_STATUSES),
+            postgresql_where=status.in_(BLOCKING_STATUSES),
         ),
     )
 

@@ -1,12 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 from pydantic import BaseModel
 from typing import List, Optional
-from datetime import date
 
 from database.database import get_db
-from database.models import Appointment
-from config import DOCTORS
+from database.models import Appointment, BLOCKING_STATUSES, STATUS_CANCELLED
+from config import DOCTORS, clinic_today
 
 router = APIRouter()
 
@@ -46,10 +46,10 @@ def list_appointments(
 @router.get("/appointments/today")
 def today_appointments(db: Session = Depends(get_db)):
     """Grouped by doctor — used by the frontend sidebar."""
-    today_str = date.today().strftime("%Y-%m-%d")
+    today_str = clinic_today().strftime("%Y-%m-%d")
     rows = (
         db.query(Appointment)
-        .filter(Appointment.date == today_str, Appointment.status == "scheduled")
+        .filter(Appointment.date == today_str, Appointment.status.in_(BLOCKING_STATUSES))
         .order_by(Appointment.time)
         .all()
     )
@@ -62,16 +62,20 @@ def today_appointments(db: Session = Depends(get_db)):
 
 
 @router.get("/appointments/upcoming")
-def upcoming_appointments(limit: int = 5, patient_name: Optional[str] = None, db: Session = Depends(get_db)):
-    """Next N scheduled appointments from today onwards."""
-    today_str = date.today().strftime("%Y-%m-%d")
+def upcoming_appointments(
+    limit: int = Query(5, ge=1, le=50),
+    patient_name: Optional[str] = None,
+    db: Session = Depends(get_db),
+):
+    """Next N active appointments from today onwards."""
+    today_str = clinic_today().strftime("%Y-%m-%d")
     q = db.query(Appointment).filter(
-        Appointment.date >= today_str, 
-        Appointment.status == "scheduled"
+        Appointment.date >= today_str,
+        Appointment.status.in_(BLOCKING_STATUSES),
     )
     if patient_name:
         q = q.filter(Appointment.patient_name == patient_name)
-        
+
     rows = q.order_by(Appointment.date, Appointment.time).limit(limit).all()
     return rows
 
@@ -86,11 +90,18 @@ def get_appointment(appointment_id: str, db: Session = Depends(get_db)):
 
 @router.delete("/appointments/{appointment_id}")
 def cancel_appointment_endpoint(appointment_id: str, db: Session = Depends(get_db)):
-    a = db.query(Appointment).filter(Appointment.id == appointment_id).first()
+    a = db.query(Appointment).filter(
+        Appointment.id == appointment_id,
+        Appointment.status.in_(BLOCKING_STATUSES),
+    ).first()
     if not a:
-        raise HTTPException(status_code=404, detail="Appointment not found")
-    a.status = "cancelled"
-    db.commit()
+        raise HTTPException(status_code=404, detail="Appointment not found or already cancelled")
+    a.status = STATUS_CANCELLED
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Could not cancel the appointment.")
     return {"message": f"Appointment {appointment_id} cancelled."}
 
 

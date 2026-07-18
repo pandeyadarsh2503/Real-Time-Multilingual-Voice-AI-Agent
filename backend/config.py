@@ -1,4 +1,7 @@
-from pydantic_settings import BaseSettings
+from datetime import datetime, date, timedelta
+from zoneinfo import ZoneInfo
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -11,13 +14,25 @@ class Settings(BaseSettings):
     EXOTEL_CALLER_ID: str = ""
     DATABASE_URL: str = "sqlite:///./swasthya.db"
     TTS_PROVIDER: str = "azure"
+    CLINIC_TIMEZONE: str = "Asia/Kolkata"
 
-    class Config:
-        env_file = ".env"
-        extra = "ignore"
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 
 settings = Settings()
+
+# ─── Clinic clock ─────────────────────────────────────────
+# All "is this slot in the past?" decisions must use the clinic's
+# timezone, not the server's (a UTC container is 5.5h behind IST).
+CLINIC_TZ = ZoneInfo(settings.CLINIC_TIMEZONE)
+
+
+def clinic_now() -> datetime:
+    return datetime.now(CLINIC_TZ)
+
+
+def clinic_today() -> date:
+    return clinic_now().date()
 
 # ─── Clinic Configuration ─────────────────────────────────
 DOCTORS = [
@@ -44,11 +59,19 @@ CLINIC_START = "09:00"
 CLINIC_END   = "17:00"
 SLOT_DURATION = 30  # minutes
 
-TIME_SLOTS = [
-    "09:00", "09:30", "10:00", "10:30", "11:00", "11:30",
-    "12:00", "12:30", "13:00", "13:30", "14:00", "14:30",
-    "15:00", "15:30", "16:00", "16:30",
-]
+
+def _generate_time_slots(start: str, end: str, step_minutes: int) -> list[str]:
+    """Derive the bookable slots from clinic hours so they can never drift apart."""
+    slots = []
+    cursor = datetime.strptime(start, "%H:%M")
+    end_dt = datetime.strptime(end, "%H:%M")
+    while cursor < end_dt:
+        slots.append(cursor.strftime("%H:%M"))
+        cursor += timedelta(minutes=step_minutes)
+    return slots
+
+
+TIME_SLOTS = _generate_time_slots(CLINIC_START, CLINIC_END, SLOT_DURATION)
 
 # Azure neural voices per language
 AZURE_VOICES = {

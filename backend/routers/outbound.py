@@ -1,13 +1,17 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, BackgroundTasks
 from sqlalchemy.orm import Session
-from pydantic import BaseModel
-from datetime import date, timedelta
+from pydantic import BaseModel, Field
+from datetime import timedelta
 from typing import Optional
 import logging
 import asyncio
 
+from config import clinic_today
 from database.database import get_db
-from database.models import Appointment, OutboundCampaign
+from database.models import (
+    Appointment, OutboundCampaign,
+    BLOCKING_STATUSES, STATUS_CONFIRMED, STATUS_CANCELLED,
+)
 from services.exotel_service import initiate_reminder_call
 from services.llm_service import generate_outbound_message
 
@@ -43,7 +47,7 @@ class PatientResponseRequest(BaseModel):
 async def trigger_call(req: TriggerRequest, db: Session = Depends(get_db)):
     appt = db.query(Appointment).filter(
         Appointment.id == req.appointment_id,
-        Appointment.status == "scheduled",
+        Appointment.status.in_(BLOCKING_STATUSES),
     ).first()
     if not appt:
         raise HTTPException(status_code=404, detail="Appointment not found")
@@ -122,7 +126,7 @@ async def exotel_webhook(request: Request, db: Session = Depends(get_db)):
                 Appointment.id == campaign.appointment_id
             ).first()
             if appt:
-                appt.status = "cancelled"
+                appt.status = STATUS_CANCELLED
         db.commit()
 
     return {"status": "ok"}
@@ -132,10 +136,10 @@ async def exotel_webhook(request: Request, db: Session = Depends(get_db)):
 @router.get("/outbound/upcoming-reminders")
 def upcoming_reminders(db: Session = Depends(get_db)):
     """Returns tomorrow's appointments — candidates for reminder calls."""
-    tomorrow = (date.today() + timedelta(days=1)).strftime("%Y-%m-%d")
+    tomorrow = (clinic_today() + timedelta(days=1)).strftime("%Y-%m-%d")
     rows = (
         db.query(Appointment)
-        .filter(Appointment.date == tomorrow, Appointment.status == "scheduled")
+        .filter(Appointment.date == tomorrow, Appointment.status.in_(BLOCKING_STATUSES))
         .all()
     )
     return [
@@ -191,7 +195,7 @@ async def handle_patient_response(
     response_lower = req.response.strip().lower()
 
     if response_lower in ("confirm", "yes", "yes confirm", "1"):
-        appt.status = "confirmed"
+        appt.status = STATUS_CONFIRMED
         db.commit()
         return {
             "action":  "confirmed",
@@ -214,12 +218,12 @@ async def handle_patient_response(
 
 # ── Demo Trigger: delayed call without appointment ID ────────
 class TriggerDemoRequest(BaseModel):
-    phone: str
-    patient_name: str
-    doctor: str
+    phone: str = Field(..., min_length=8, max_length=16, pattern=r"^\+?[0-9 ]+$")
+    patient_name: str = Field(..., min_length=1, max_length=120)
+    doctor: str = Field(..., min_length=1, max_length=120)
     date: str
     time: str
-    delay_minutes: int = 1   # how many minutes to wait before calling
+    delay_minutes: int = Field(1, ge=0, le=60)   # bounded — a background sleep is not a scheduler
     language: str = "English"
 
 

@@ -1,13 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
 import logging
 
 from database.database import get_db
 from services.llm_service import run_agent
 from services.memory_service import (
-    get_session, append_to_session, persist_text,
+    get_session, append_to_session, replace_session, persist_text,
     get_patient_memory, update_patient_memory,
 )
 from services.stt_service import detect_language_from_text
@@ -21,9 +21,9 @@ router = APIRouter()
 
 
 class ChatRequest(BaseModel):
-    message: str
-    session_id: str
-    patient_name: Optional[str] = None
+    message: str = Field(..., min_length=1, max_length=2000)
+    session_id: str = Field(..., min_length=1, max_length=64)
+    patient_name: Optional[str] = Field(None, max_length=120)
     language: Optional[str] = None   # client-detected lang hint
 
 
@@ -51,16 +51,30 @@ async def chat(req: ChatRequest, db: Session = Depends(get_db)):
                 )
 
         # 3. Load live session and append new user turn
-        history = get_session(req.session_id, db)
+        get_session(req.session_id, db)  # seeds from DB on first access
         append_to_session(req.session_id, {"role": "user", "content": user_text})
         persist_text(req.session_id, "user", req.message, db)
 
         # 4. Tool executor closure (captures db + patient name)
+        REQUIRED_ARGS = {
+            "check_availability":     ("doctor", "date"),
+            "book_appointment":       ("name", "doctor", "date", "time"),
+            "reschedule_appointment": ("appointment_id", "new_date", "new_time"),
+            "cancel_appointment":     ("appointment_id",),
+        }
+
         async def tool_executor(tool_name: str, args: dict):
+            required = REQUIRED_ARGS.get(tool_name)
+            if required is None:
+                return {"error": f"Unknown tool: {tool_name}"}
+            missing = [k for k in required if not args.get(k)]
+            if missing:
+                return {"error": f"Missing required arguments: {', '.join(missing)}. Ask the user for them."}
+
             if tool_name == "check_availability":
                 return check_availability(args["doctor"], args["date"], db)
 
-            elif tool_name == "book_appointment":
+            if tool_name == "book_appointment":
                 result = book_appointment(
                     args["name"], args["doctor"], args["date"], args["time"], db
                 )
@@ -72,23 +86,19 @@ async def chat(req: ChatRequest, db: Session = Depends(get_db)):
                     }, db)
                 return result
 
-            elif tool_name == "reschedule_appointment":
+            if tool_name == "reschedule_appointment":
                 return reschedule_appointment(
                     args["appointment_id"], args["new_date"], args["new_time"], db
                 )
 
-            elif tool_name == "cancel_appointment":
-                return cancel_appointment(args["appointment_id"], db)
-
-            return {"error": f"Unknown tool: {tool_name}"}
+            return cancel_appointment(args["appointment_id"], db)
 
         # 5. Run LLM agent
         current_messages = get_session(req.session_id, db)
         response_text, updated = await run_agent(current_messages, tool_executor)
 
         # 6. Replace session with updated messages (tool calls included)
-        from services.memory_service import _sessions
-        _sessions[req.session_id] = updated
+        replace_session(req.session_id, updated)
 
         # 7. Persist assistant reply
         persist_text(req.session_id, "assistant", response_text, db)
@@ -99,6 +109,9 @@ async def chat(req: ChatRequest, db: Session = Depends(get_db)):
             language=lang,
         )
 
-    except Exception as exc:
-        logger.error(f"Chat error: {exc}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(exc))
+    except Exception:
+        logger.exception("Chat error")
+        raise HTTPException(
+            status_code=500,
+            detail="The assistant hit an internal error. Please try again.",
+        )

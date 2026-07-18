@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from database.database import engine
+from database.database import engine, run_startup_migrations
 from database.models import Base
 from routers import chat, voice, appointments, outbound
 
@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # ── Startup ────────────────────────────────────────────
+    run_startup_migrations()
     Base.metadata.create_all(bind=engine)
     logger.info("✅ Database tables created / verified.")
     yield

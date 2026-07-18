@@ -1,14 +1,19 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
-from fastapi.responses import Response
-from pydantic import BaseModel
-from typing import Optional
+import asyncio
 import logging
+from typing import Optional
+
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form
+from fastapi.responses import Response
+from pydantic import BaseModel, Field
 
 from services.stt_service import transcribe
 from services.tts_service import synthesize_speech
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+MAX_AUDIO_BYTES = 10 * 1024 * 1024   # 10 MB ≈ several minutes of webm/opus
+MAX_TTS_CHARS   = 1000
 
 
 # ── STT endpoint ───────────────────────────────────────────
@@ -20,18 +25,23 @@ async def speech_to_text(
     """
     Accept uploaded audio (webm/wav/mp3) → return transcript + detected language.
     """
+    audio_bytes = await audio.read()
+    if len(audio_bytes) == 0:
+        raise HTTPException(status_code=400, detail="Empty audio upload.")
+    if len(audio_bytes) > MAX_AUDIO_BYTES:
+        raise HTTPException(status_code=413, detail="Audio file too large (max 10 MB).")
+
     try:
-        audio_bytes = await audio.read()
-        result = transcribe(audio_bytes, language_hint)
-        return result
-    except Exception as exc:
-        logger.error(f"STT error: {exc}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(exc))
+        # Whisper inference is CPU-bound — keep it off the event loop.
+        return await asyncio.to_thread(transcribe, audio_bytes, language_hint)
+    except Exception:
+        logger.exception("STT error")
+        raise HTTPException(status_code=500, detail="Transcription failed. Please try again.")
 
 
 # ── TTS endpoint ───────────────────────────────────────────
 class TTSRequest(BaseModel):
-    text: str
+    text: str = Field(..., min_length=1, max_length=MAX_TTS_CHARS)
     language: str = "en"
 
 
@@ -41,12 +51,12 @@ async def text_to_speech(req: TTSRequest):
     Accept text + language code → return MP3 audio bytes.
     """
     try:
-        audio_bytes = synthesize_speech(req.text, req.language)
+        audio_bytes = await asyncio.to_thread(synthesize_speech, req.text, req.language)
         return Response(
             content=audio_bytes,
             media_type="audio/mpeg",
             headers={"Content-Disposition": "inline; filename=response.mp3"},
         )
-    except Exception as exc:
-        logger.error(f"TTS error: {exc}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(exc))
+    except Exception:
+        logger.exception("TTS error")
+        raise HTTPException(status_code=500, detail="Speech synthesis failed. Please try again.")

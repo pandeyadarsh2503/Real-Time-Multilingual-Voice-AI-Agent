@@ -2,14 +2,15 @@
 Groq + LLaMA-3 70B agent with tool-calling loop.
 Supports: book_appointment, reschedule_appointment, cancel_appointment, check_availability
 """
+import asyncio
 import json
 import logging
-from datetime import datetime, date
 from groq import Groq
-from config import settings, GROQ_MODEL, DOCTOR_NAMES, DOCTORS
+from config import settings, GROQ_MODEL, DOCTOR_NAMES, DOCTORS, clinic_now, clinic_today
 
 logger = logging.getLogger(__name__)
-client = Groq(api_key=settings.GROQ_API_KEY)
+# timeout + bounded retries so a hung Groq call can't pin a request forever
+client = Groq(api_key=settings.GROQ_API_KEY, timeout=30.0, max_retries=2)
 
 DOCTORS_TEXT = "\n".join([f"  {i+1}. {d['name']} — {d['specialty']} | {d.get('availability', '')} | {', '.join(d.get('languages', []))}" for i, d in enumerate(DOCTORS)])
 DOCTORS_EXAMPLE = ", ".join([f"'{d}'" for d in DOCTOR_NAMES[:3]]) + " etc."
@@ -187,17 +188,20 @@ async def run_agent(messages: list, tool_executor, max_iter: int = 6) -> tuple[s
     """
     msgs = list(messages)  # work on a copy
 
-    for _ in range(max_iter):
-        system = {
-            "role": "system",
-            "content": SYSTEM_PROMPT.format(
-                today=date.today().isoformat(),
-                now=datetime.now().strftime("%H:%M"),
-                doctors_list=DOCTORS_TEXT,
-            ),
-        }
+    system = {
+        "role": "system",
+        "content": SYSTEM_PROMPT.format(
+            today=clinic_today().isoformat(),
+            now=clinic_now().strftime("%H:%M"),
+            doctors_list=DOCTORS_TEXT,
+        ),
+    }
 
-        response = client.chat.completions.create(
+    for _ in range(max_iter):
+        # The Groq SDK is synchronous — run it in a worker thread so a
+        # multi-second LLM call never blocks the event loop.
+        response = await asyncio.to_thread(
+            client.chat.completions.create,
             model=GROQ_MODEL,
             messages=[system] + msgs,
             tools=TOOLS,
@@ -236,11 +240,27 @@ async def run_agent(messages: list, tool_executor, max_iter: int = 6) -> tuple[s
         for tc in msg.tool_calls:
             try:
                 args = json.loads(tc.function.arguments)
-            except json.JSONDecodeError:
-                args = {}
+                if not isinstance(args, dict):
+                    raise ValueError("arguments must be a JSON object")
+            except (json.JSONDecodeError, ValueError) as e:
+                # Feed the parse failure back to the model instead of
+                # executing a tool with missing arguments.
+                logger.warning(f"Malformed tool arguments for {tc.function.name}: {e}")
+                msgs.append({
+                    "role": "tool",
+                    "tool_call_id": tc.id,
+                    "content": json.dumps({
+                        "error": "Invalid tool arguments. Re-emit the call with valid JSON."
+                    }),
+                })
+                continue
 
             logger.info(f"Tool call → {tc.function.name}({args})")
-            result = await tool_executor(tc.function.name, args)
+            try:
+                result = await tool_executor(tc.function.name, args)
+            except Exception:
+                logger.exception(f"Tool {tc.function.name} raised")
+                result = {"error": "The tool failed unexpectedly. Apologise and ask the user to try again."}
             logger.info(f"Tool result ← {result}")
 
             msgs.append({
@@ -276,7 +296,8 @@ async def generate_outbound_message(
         f"\nReturn ONLY the spoken message text."
     )
 
-    response = client.chat.completions.create(
+    response = await asyncio.to_thread(
+        client.chat.completions.create,
         model=GROQ_MODEL,
         messages=[
             {"role": "system", "content": OUTBOUND_SYSTEM_PROMPT},

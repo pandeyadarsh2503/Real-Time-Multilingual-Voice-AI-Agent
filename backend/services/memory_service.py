@@ -19,17 +19,23 @@ _sessions: Dict[str, List[dict]] = {}
 def get_session(session_id: str, db: Session) -> List[dict]:
     """Return the live message list for this session. Seeds from DB if first access."""
     if session_id not in _sessions:
+        # Most recent N turns, restored in chronological order.
         rows = (
             db.query(Memory)
             .filter(Memory.session_id == session_id)
-            .order_by(Memory.timestamp)
+            .order_by(Memory.timestamp.desc(), Memory.id.desc())
             .limit(MAX_DB_HISTORY)
             .all()
         )
         _sessions[session_id] = [
-            {"role": r.role, "content": r.content} for r in rows
+            {"role": r.role, "content": r.content} for r in reversed(rows)
         ]
     return _sessions[session_id]
+
+
+def replace_session(session_id: str, messages: List[dict]):
+    """Replace the live message list (e.g. with the agent's updated transcript)."""
+    _sessions[session_id] = messages[-MAX_SESSION:]
 
 
 def append_to_session(session_id: str, message: dict):
