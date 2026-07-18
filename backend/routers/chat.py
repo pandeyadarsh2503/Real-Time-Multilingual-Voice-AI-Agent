@@ -54,7 +54,7 @@ async def chat(
         # 2. Build user message, optionally injecting patient memory
         user_text = req.message
         if patient_name:
-            mem = get_patient_memory(patient_name, db)
+            mem = get_patient_memory(patient_name, db, uid=user["uid"])
             if mem and mem.get("preferred_doctor"):
                 user_text += (
                     f"\n[Patient memory: {patient_name} "
@@ -91,14 +91,15 @@ async def chat(
 
             if tool_name == "book_appointment":
                 result = book_appointment(
-                    args["name"], args["doctor"], args["date"], args["time"], db
+                    args["name"], args["doctor"], args["date"], args["time"], db,
+                    patient_uid=user["uid"],
                 )
                 if result.get("success") and patient_name:
                     update_patient_memory(patient_name, {
                         "preferred_doctor": args["doctor"],
                         "language": lang,
                         "last_appointment_id": result.get("appointment_id"),
-                    }, db)
+                    }, db, uid=user["uid"])
                 return result
 
             if tool_name == "reschedule_appointment":

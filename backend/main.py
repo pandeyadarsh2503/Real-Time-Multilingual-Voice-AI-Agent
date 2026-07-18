@@ -8,8 +8,7 @@ from slowapi.middleware import SlowAPIMiddleware
 
 from config import settings
 from core.rate_limit import limiter
-from database.database import engine, run_startup_migrations
-from database.models import Base
+from database.database import run_startup_migrations
 from routers import chat, voice, appointments, outbound
 
 logging.basicConfig(
@@ -25,8 +24,7 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     # ── Startup ────────────────────────────────────────────
     run_startup_migrations()
-    Base.metadata.create_all(bind=engine)
-    logger.info("✅ Database tables created / verified.")
+    logger.info("✅ Database schema created / verified.")
     if settings.AUTH_DISABLED:
         logger.warning("⚠️  AUTH_DISABLED=true — API is running WITHOUT authentication.")
     elif not settings.FIREBASE_PROJECT_ID:

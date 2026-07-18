@@ -66,7 +66,14 @@ def check_availability(doctor: str, date_str: str, db: Session) -> dict:
     }
 
 
-def book_appointment(name: str, doctor: str, date_str: str, time_str: str, db: Session) -> dict:
+def book_appointment(
+    name: str,
+    doctor: str,
+    date_str: str,
+    time_str: str,
+    db: Session,
+    patient_uid: Optional[str] = None,
+) -> dict:
     """Book a slot after validation."""
     if doctor not in DOCTOR_NAMES:
         return {"error": f"Doctor '{doctor}' not found. Available: {', '.join(DOCTOR_NAMES)}"}
@@ -104,6 +111,7 @@ def book_appointment(name: str, doctor: str, date_str: str, time_str: str, db: S
     appt_id = str(uuid.uuid4())[:8].upper()
     appt = Appointment(
         id=appt_id,
+        patient_uid=patient_uid,
         patient_name=name,
         doctor=doctor,
         date=date_str,

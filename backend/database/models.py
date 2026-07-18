@@ -22,21 +22,24 @@ BLOCKING_STATUSES = (STATUS_SCHEDULED, STATUS_CONFIRMED)
 class Appointment(Base):
     __tablename__ = "appointments"
 
-    id           = Column(String, primary_key=True, default=_new_id)
-    patient_name = Column(String, nullable=False)
-    doctor       = Column(String, nullable=False)
-    date         = Column(String, nullable=False)   # YYYY-MM-DD
-    time         = Column(String, nullable=False)   # HH:MM (24h)
-    status       = Column(String, default=STATUS_SCHEDULED)
-    created_at   = Column(DateTime, server_default=func.now())
+    id           = Column(String(8), primary_key=True, default=_new_id)
+    # Firebase uid of the booking user. Nullable for legacy rows that
+    # predate authentication; ownership checks fall back to the name.
+    patient_uid  = Column(String(128), index=True)
+    patient_name = Column(String(120), nullable=False)
+    doctor       = Column(String(120), nullable=False)
+    date         = Column(String(10), nullable=False)   # YYYY-MM-DD
+    time         = Column(String(5), nullable=False)    # HH:MM (24h)
+    status       = Column(String(20), default=STATUS_SCHEDULED, nullable=False)
+    created_at   = Column(DateTime(timezone=True), server_default=func.now())
 
-    # ── Race-condition guard ───────────────────────────────
-    # Partial unique index: at most ONE active (scheduled/confirmed)
-    # appointment per doctor + date + time. Cancelled/completed rows
-    # are excluded, so re-booking and re-cancelling a slot can never
-    # trip the constraint (the old 4-column UNIQUE that included
-    # `status` made the *second* cancellation of a slot crash).
     __table_args__ = (
+        # ── Race-condition guard ───────────────────────────
+        # Partial unique index: at most ONE active (scheduled/confirmed)
+        # appointment per doctor + date + time. Cancelled/completed rows
+        # are excluded, so re-booking and re-cancelling a slot can never
+        # trip the constraint. Enforced natively by both SQLite and
+        # PostgreSQL.
         Index(
             "uq_active_slot",
             "doctor", "date", "time",
@@ -44,6 +47,8 @@ class Appointment(Base):
             sqlite_where=status.in_(BLOCKING_STATUSES),
             postgresql_where=status.in_(BLOCKING_STATUSES),
         ),
+        # Serves check_availability / conflict lookups.
+        Index("ix_appt_doctor_date_status", "doctor", "date", "status"),
     )
 
 
@@ -51,31 +56,38 @@ class Patient(Base):
     __tablename__ = "patients"
 
     id                  = Column(Integer, primary_key=True, autoincrement=True)
-    name                = Column(String, unique=True, nullable=False)
-    phone               = Column(String)
-    preferred_doctor    = Column(String)
-    language            = Column(String, default="en")   # en | hi | ta
-    last_appointment_id = Column(String)
-    created_at          = Column(DateTime, server_default=func.now())
+    # Firebase uid — the stable identity. Nullable for legacy rows.
+    uid                 = Column(String(128), unique=True)
+    name                = Column(String(120), unique=True, nullable=False)
+    phone               = Column(String(20))
+    preferred_doctor    = Column(String(120))
+    language            = Column(String(5), default="en")   # en | hi | ta
+    last_appointment_id = Column(String(8))
+    created_at          = Column(DateTime(timezone=True), server_default=func.now())
 
 
 class Memory(Base):
     __tablename__ = "memory"
 
     id         = Column(Integer, primary_key=True, autoincrement=True)
-    session_id = Column(String, nullable=False, index=True)
-    role       = Column(String, nullable=False)   # user | assistant
+    session_id = Column(String(200), nullable=False)
+    role       = Column(String(20), nullable=False)   # user | assistant
     content    = Column(Text, nullable=False)
-    timestamp  = Column(DateTime, server_default=func.now())
+    timestamp  = Column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        # Serves the "newest N turns for a session" restore query.
+        Index("ix_memory_session_ts", "session_id", "timestamp"),
+    )
 
 
 class OutboundCampaign(Base):
     __tablename__ = "outbound_campaigns"
 
     id             = Column(Integer, primary_key=True, autoincrement=True)
-    appointment_id = Column(String, ForeignKey("appointments.id"))
-    phone          = Column(String)
-    status         = Column(String, default="pending")  # pending | confirmed | rescheduled | rejected | failed
-    call_sid       = Column(String)
-    triggered_at   = Column(DateTime, server_default=func.now())
-    updated_at     = Column(DateTime, onupdate=func.now())
+    appointment_id = Column(String(8), ForeignKey("appointments.id"))
+    phone          = Column(String(20))
+    status         = Column(String(20), default="pending")  # pending | confirmed | rescheduled | rejected | failed
+    call_sid       = Column(String(64), index=True)
+    triggered_at   = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at     = Column(DateTime(timezone=True), onupdate=func.now())

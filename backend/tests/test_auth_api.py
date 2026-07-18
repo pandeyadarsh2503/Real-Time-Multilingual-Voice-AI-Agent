@@ -50,10 +50,14 @@ def client():
     app.dependency_overrides[get_db] = override_get_db
     seed = TestSession()
     seed.add_all([
+        # Legacy rows (no uid) — ownership falls back to name matching.
         Appointment(id="ASHA0001", patient_name="Asha", doctor="Dr Ananya Iyer",
                     date=FUTURE, time="10:00", status="scheduled"),
         Appointment(id="RAVI0001", patient_name="Ravi", doctor="Dr Ananya Iyer",
                     date=FUTURE, time="10:30", status="scheduled"),
+        # uid-linked row booked under a different display name — uid wins.
+        Appointment(id="ASHA0002", patient_uid="uid-asha", patient_name="A. Sharma",
+                    doctor="Dr Ananya Iyer", date=FUTURE, time="11:00", status="scheduled"),
     ])
     seed.commit()
     seed.close()
@@ -82,17 +86,29 @@ def test_health_endpoints_are_public(client):
 def test_patient_sees_only_own_appointments(client):
     login_as(PATIENT_ASHA)
     rows = client.get("/api/appointments").json()
-    assert [r["id"] for r in rows] == ["ASHA0001"]
+    # Legacy row matched by name + uid-linked row matched by uid.
+    assert {r["id"] for r in rows} == {"ASHA0001", "ASHA0002"}
 
     # filter injection attempt is ignored for patients
     rows = client.get("/api/appointments", params={"patient_name": "Ravi"}).json()
-    assert [r["id"] for r in rows] == ["ASHA0001"]
+    assert {r["id"] for r in rows} == {"ASHA0001", "ASHA0002"}
+
+
+def test_uid_ownership_beats_name(client):
+    # Ravi cannot see or cancel Asha's uid-linked appointment even
+    # though its display name differs from Asha's.
+    login_as(PATIENT_RAVI)
+    assert client.get("/api/appointments/ASHA0002").status_code == 404
+    assert client.delete("/api/appointments/ASHA0002").status_code == 404
+    login_as(PATIENT_ASHA)
+    assert client.get("/api/appointments/ASHA0002").status_code == 200
+    assert client.delete("/api/appointments/ASHA0002").status_code == 200
 
 
 def test_doctor_sees_all_appointments(client):
     login_as(DOCTOR_USER)
     rows = client.get("/api/appointments").json()
-    assert {r["id"] for r in rows} == {"ASHA0001", "RAVI0001"}
+    assert {r["id"] for r in rows} == {"ASHA0001", "RAVI0001", "ASHA0002"}
 
 
 def test_patient_cannot_cancel_someone_elses_appointment(client):

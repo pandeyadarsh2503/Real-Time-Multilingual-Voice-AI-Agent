@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from pydantic import BaseModel, ConfigDict
@@ -14,6 +15,21 @@ router = APIRouter()
 
 def _own_name(user: dict) -> str:
     return user["name"] or user["email"]
+
+
+def _owned_by(user: dict):
+    """Filter: rows belonging to this user — uid match, or legacy rows
+    (booked before auth existed) matched by name."""
+    return or_(
+        Appointment.patient_uid == user["uid"],
+        Appointment.patient_uid.is_(None) & (Appointment.patient_name == _own_name(user)),
+    )
+
+
+def _is_owner(a: Appointment, user: dict) -> bool:
+    if a.patient_uid:
+        return a.patient_uid == user["uid"]
+    return a.patient_name == _own_name(user)
 
 
 class AppointmentOut(BaseModel):
@@ -40,7 +56,7 @@ def list_appointments(
     # Patients only ever see their own bookings, regardless of the
     # filter they send; doctors/admins may query freely.
     if user["role"] == ROLE_PATIENT:
-        q = q.filter(Appointment.patient_name == _own_name(user))
+        q = q.filter(_owned_by(user))
     elif patient_name:
         q = q.filter(Appointment.patient_name == patient_name)
     if doctor:
@@ -84,7 +100,7 @@ def upcoming_appointments(
         Appointment.status.in_(BLOCKING_STATUSES),
     )
     if user["role"] == ROLE_PATIENT:
-        q = q.filter(Appointment.patient_name == _own_name(user))
+        q = q.filter(_owned_by(user))
     elif patient_name:
         q = q.filter(Appointment.patient_name == patient_name)
 
@@ -99,7 +115,7 @@ def get_appointment(
     user: dict = Depends(get_current_user),
 ):
     a = db.query(Appointment).filter(Appointment.id == appointment_id).first()
-    if not a or (user["role"] == ROLE_PATIENT and a.patient_name != _own_name(user)):
+    if not a or (user["role"] == ROLE_PATIENT and not _is_owner(a, user)):
         # 404 (not 403) so appointment IDs can't be enumerated
         raise HTTPException(status_code=404, detail="Appointment not found")
     return a
@@ -115,7 +131,7 @@ def cancel_appointment_endpoint(
         Appointment.id == appointment_id,
         Appointment.status.in_(BLOCKING_STATUSES),
     ).first()
-    if not a or (user["role"] == ROLE_PATIENT and a.patient_name != _own_name(user)):
+    if not a or (user["role"] == ROLE_PATIENT and not _is_owner(a, user)):
         raise HTTPException(status_code=404, detail="Appointment not found or already cancelled")
     a.status = STATUS_CANCELLED
     try:

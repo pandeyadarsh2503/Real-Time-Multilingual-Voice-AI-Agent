@@ -61,9 +61,19 @@ def clear_session(session_id: str, db: Session):
 
 
 # ── Patient long-term memory ───────────────────────────────
+# Looked up by Firebase uid when available (the stable identity);
+# name is the fallback for legacy rows created before authentication.
 
-def get_patient_memory(name: str, db: Session) -> Optional[dict]:
-    p = db.query(Patient).filter(Patient.name == name).first()
+def _find_patient(name: str, db: Session, uid: Optional[str] = None) -> Optional[Patient]:
+    if uid:
+        p = db.query(Patient).filter(Patient.uid == uid).first()
+        if p:
+            return p
+    return db.query(Patient).filter(Patient.name == name).first()
+
+
+def get_patient_memory(name: str, db: Session, uid: Optional[str] = None) -> Optional[dict]:
+    p = _find_patient(name, db, uid)
     if not p:
         return None
     return {
@@ -74,11 +84,13 @@ def get_patient_memory(name: str, db: Session) -> Optional[dict]:
     }
 
 
-def update_patient_memory(name: str, updates: dict, db: Session):
-    p = db.query(Patient).filter(Patient.name == name).first()
+def update_patient_memory(name: str, updates: dict, db: Session, uid: Optional[str] = None):
+    p = _find_patient(name, db, uid)
     if not p:
         p = Patient(name=name)
         db.add(p)
+    if uid and not p.uid:
+        p.uid = uid
     for k, v in updates.items():
         if hasattr(p, k) and v is not None:
             setattr(p, k, v)
