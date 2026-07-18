@@ -3,8 +3,10 @@ Exotel outbound call integration.
 Docs: https://developer.exotel.com/api/
 """
 import logging
+
 import requests
 from requests.auth import HTTPBasicAuth
+
 from config import settings
 
 logger = logging.getLogger(__name__)

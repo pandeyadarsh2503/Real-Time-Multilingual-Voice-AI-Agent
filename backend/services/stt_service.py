@@ -2,10 +2,12 @@
 Speech-to-Text via faster-whisper.
 Saves audio to a temp file (required for ffmpeg-backed decoding of webm/opus).
 """
+import logging
 import os
 import tempfile
-import logging
+
 from faster_whisper import WhisperModel
+
 from config import WHISPER_MODEL
 
 logger = logging.getLogger(__name__)

@@ -1,18 +1,20 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, BackgroundTasks
-from sqlalchemy.orm import Session
-from pydantic import BaseModel, Field
-from datetime import timedelta
-from typing import Optional
-import logging
 import asyncio
-
 import hmac
+import logging
+from datetime import timedelta
+
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
+from pydantic import BaseModel, Field
+from sqlalchemy.orm import Session
 
 from config import clinic_today, settings
 from database.database import get_db
 from database.models import (
-    Appointment, OutboundCampaign,
-    BLOCKING_STATUSES, STATUS_CONFIRMED, STATUS_CANCELLED,
+    BLOCKING_STATUSES,
+    STATUS_CANCELLED,
+    STATUS_CONFIRMED,
+    Appointment,
+    OutboundCampaign,
 )
 from services.auth_service import get_current_user
 from services.exotel_service import initiate_reminder_call

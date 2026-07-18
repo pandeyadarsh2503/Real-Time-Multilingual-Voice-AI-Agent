@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
-from sqlalchemy.orm import Session
-from pydantic import BaseModel, Field
-from typing import Optional
 import logging
+from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from pydantic import BaseModel, Field
+from sqlalchemy.orm import Session
 
 from core.metrics import CHAT_TURNS
 from core.rate_limit import limiter
@@ -10,14 +11,20 @@ from database.database import get_db
 from services.auth_service import get_current_user
 from services.llm_service import run_agent, summarize_conversation
 from services.memory_service import (
-    get_session, append_to_session, replace_session, persist_text,
+    append_to_session,
     compress_session_messages,
-    get_patient_memory, update_patient_memory,
+    get_patient_memory,
+    get_session,
+    persist_text,
+    replace_session,
+    update_patient_memory,
 )
 from services.stt_service import detect_language_from_text
 from tools.appointment_tools import (
-    check_availability, book_appointment,
-    reschedule_appointment, cancel_appointment,
+    book_appointment,
+    cancel_appointment,
+    check_availability,
+    reschedule_appointment,
 )
 
 logger = logging.getLogger(__name__)
@@ -136,4 +143,4 @@ async def chat(
         raise HTTPException(
             status_code=500,
             detail="The assistant hit an internal error. Please try again.",
-        )
+        ) from None

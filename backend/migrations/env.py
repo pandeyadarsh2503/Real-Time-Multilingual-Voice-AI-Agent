@@ -10,7 +10,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from config import settings                    # noqa: E402
 from database.database import Base             # noqa: E402
-from database import models                    # noqa: E402  (registers tables)
 
 config = context.config
 if config.config_file_name is not None:

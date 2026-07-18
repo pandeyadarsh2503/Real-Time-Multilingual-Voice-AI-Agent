@@ -1,14 +1,15 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import or_
-from sqlalchemy.orm import Session
-from sqlalchemy.exc import IntegrityError
-from pydantic import BaseModel, ConfigDict
 from typing import List, Optional
 
-from database.database import get_db
-from database.models import Appointment, BLOCKING_STATUSES, STATUS_CANCELLED
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, ConfigDict
+from sqlalchemy import or_
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
+
 from config import DOCTORS, clinic_today
-from services.auth_service import get_current_user, require_role, ROLE_PATIENT, ROLE_DOCTOR
+from database.database import get_db
+from database.models import BLOCKING_STATUSES, STATUS_CANCELLED, Appointment
+from services.auth_service import ROLE_DOCTOR, ROLE_PATIENT, get_current_user, require_role
 
 router = APIRouter()
 
@@ -138,7 +139,7 @@ def cancel_appointment_endpoint(
         db.commit()
     except IntegrityError:
         db.rollback()
-        raise HTTPException(status_code=500, detail="Could not cancel the appointment.")
+        raise HTTPException(status_code=500, detail="Could not cancel the appointment.") from None
     return {"message": f"Appointment {appointment_id} cancelled."}
 
 

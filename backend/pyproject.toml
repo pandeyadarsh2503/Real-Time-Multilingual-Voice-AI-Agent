@@ -1,0 +1,19 @@
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+exclude = ["venv", ".venv"]
+
+[tool.ruff.lint]
+# E/W pycodestyle, F pyflakes, I import order, B bugbear (likely bugs)
+select = ["E", "F", "W", "I", "B"]
+ignore = [
+    "E501",  # long lines: prompts and log messages read better unwrapped
+    "B008",  # Depends()/File() in argument defaults IS the FastAPI idiom
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Alembic migration files keep their generated import style
+"migrations/*" = ["I001"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

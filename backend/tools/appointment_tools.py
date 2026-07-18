@@ -1,15 +1,17 @@
-from datetime import datetime, date
-from typing import Optional
-from sqlalchemy.orm import Session
-from sqlalchemy.exc import IntegrityError
-from database.models import (
-    Appointment,
-    BLOCKING_STATUSES,
-    STATUS_SCHEDULED,
-    STATUS_CANCELLED,
-)
-from config import TIME_SLOTS, DOCTOR_NAMES, clinic_now, clinic_today
 import uuid
+from datetime import date, datetime
+from typing import Optional
+
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
+
+from config import DOCTOR_NAMES, TIME_SLOTS, clinic_now, clinic_today
+from database.models import (
+    BLOCKING_STATUSES,
+    STATUS_CANCELLED,
+    STATUS_SCHEDULED,
+    Appointment,
+)
 
 
 def _parse_date(date_str: str) -> Optional[date]:

@@ -83,10 +83,10 @@ def verify_firebase_token(token: str) -> dict:
     except HTTPException:
         raise
     except jwt.ExpiredSignatureError:
-        raise HTTPException(status_code=401, detail="Token has expired. Please sign in again.")
+        raise HTTPException(status_code=401, detail="Token has expired. Please sign in again.") from None
     except Exception as exc:
         logger.warning(f"Token verification failed: {exc}")
-        raise HTTPException(status_code=401, detail="Invalid authentication token.")
+        raise HTTPException(status_code=401, detail="Invalid authentication token.") from exc
 
     if not claims.get("sub"):
         raise HTTPException(status_code=401, detail="Invalid authentication token.")

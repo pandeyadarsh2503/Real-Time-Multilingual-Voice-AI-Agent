@@ -5,8 +5,10 @@ Falls back to gTTS if Azure credentials are missing.
 """
 import io
 import logging
+
 import azure.cognitiveservices.speech as speechsdk
-from config import settings, AZURE_VOICES
+
+from config import AZURE_VOICES, settings
 
 logger = logging.getLogger(__name__)
 

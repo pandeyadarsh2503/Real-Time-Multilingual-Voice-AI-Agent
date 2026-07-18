@@ -6,8 +6,10 @@ import asyncio
 import json
 import logging
 import time
+
 from groq import Groq
-from config import settings, GROQ_MODEL, DOCTOR_NAMES, DOCTORS, clinic_now, clinic_today
+
+from config import DOCTOR_NAMES, DOCTORS, GROQ_MODEL, clinic_now, clinic_today, settings
 from core.metrics import LLM_LATENCY, TOOL_CALLS
 
 logger = logging.getLogger(__name__)

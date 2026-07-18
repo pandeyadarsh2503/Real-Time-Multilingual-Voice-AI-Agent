@@ -112,7 +112,7 @@ Instrumentator(excluded_handlers=["/metrics", "/health.*"]).instrument(app)
 init_tracing(app)
 
 # ── Routers ────────────────────────────────────────────────
-from routers import chat, voice, appointments, outbound  # noqa: E402
+from routers import appointments, chat, outbound, voice  # noqa: E402
 
 app.include_router(chat.router,         prefix="/api", tags=["Chat"])
 app.include_router(voice.router,        prefix="/api", tags=["Voice"])

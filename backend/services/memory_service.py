@@ -20,7 +20,6 @@ COMPRESS_AFTER, everything but the most recent turns is folded into a
 single summary message (produced by the LLM) so the prompt stays small
 and old context survives as a digest instead of being truncated away.
 """
-import asyncio
 import json
 import logging
 import time

@@ -3,7 +3,7 @@ import logging
 import time
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, UploadFile, File, Form
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Response, UploadFile
 from pydantic import BaseModel, Field
 
 from core.metrics import STT_LATENCY, TTS_LATENCY
@@ -45,7 +45,7 @@ async def speech_to_text(
         return result
     except Exception:
         logger.exception("STT error")
-        raise HTTPException(status_code=500, detail="Transcription failed. Please try again.")
+        raise HTTPException(status_code=500, detail="Transcription failed. Please try again.") from None
 
 
 # ── TTS endpoint ───────────────────────────────────────────
@@ -71,4 +71,4 @@ async def text_to_speech(request: Request, req: TTSRequest):
         )
     except Exception:
         logger.exception("TTS error")
-        raise HTTPException(status_code=500, detail="Speech synthesis failed. Please try again.")
+        raise HTTPException(status_code=500, detail="Speech synthesis failed. Please try again.") from None

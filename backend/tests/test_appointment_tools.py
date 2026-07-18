@@ -16,14 +16,14 @@ from sqlalchemy.orm import sessionmaker
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from config import clinic_today, TIME_SLOTS, DOCTOR_NAMES
+from config import DOCTOR_NAMES, TIME_SLOTS, clinic_today
 from database.database import Base
-from database.models import Appointment, STATUS_CONFIRMED, STATUS_CANCELLED
+from database.models import STATUS_CANCELLED, STATUS_CONFIRMED, Appointment
 from tools.appointment_tools import (
-    check_availability,
     book_appointment,
-    reschedule_appointment,
     cancel_appointment,
+    check_availability,
+    reschedule_appointment,
 )
 
 DOCTOR = DOCTOR_NAMES[0]
