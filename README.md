@@ -60,12 +60,19 @@ This runs the isolated stack with persistent volume storage.
 2. **Configure Environment**
    ```bash
    copy backend\.env.example backend\.env
+   copy frontend\.env.example frontend\.env
    ```
    *Required variables within `backend/.env`:*
    - `GROQ_API_KEY`: Groq Console API Token
    - `AZURE_TTS_KEY`: Azure Cognitive Speech Access Key
    - `AZURE_TTS_REGION`: Location region (e.g. `eastus`)
    - `EXOTEL_API_KEY` / `EXOTEL_API_TOKEN` / `EXOTEL_SID` / `EXOTEL_CALLER_ID`: Exotel Telephony Credentials
+   - `CLINIC_TIMEZONE` (optional): IANA timezone for the clinic clock, default `Asia/Kolkata`
+
+   *Required variables within `frontend/.env`* — **the app is gated behind Firebase login and will not work without these**:
+   - `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_STORAGE_BUCKET`, `VITE_FIREBASE_MESSAGING_SENDER_ID`, `VITE_FIREBASE_APP_ID`
+
+   Create a free Firebase project at https://console.firebase.google.com, enable **Authentication → Email/Password**, then copy the web-app config values from *Project settings → Your apps*. See [frontend/.env.example](frontend/.env.example).
 
 3. **Deploy Containerized Stack**
    ```bash
