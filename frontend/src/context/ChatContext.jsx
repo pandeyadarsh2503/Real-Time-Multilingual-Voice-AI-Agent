@@ -20,7 +20,8 @@ export function ChatProvider({ user, children }) {
   const [sessionId] = useState(() => uuidv4())   // fresh session per app load
   const [messages, setMessages] = useState([])
   const [status, setStatus] = useState('ready')
-  const [language, setLanguage] = useState('en')
+  // Pre-login language choice (Login page pills) carries through.
+  const [language, setLanguage] = useState(() => localStorage.getItem('preferredLang') || 'en')
 
   const patientName = user?.displayName || 'Guest'
 
