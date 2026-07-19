@@ -8,6 +8,7 @@ import { ChatProvider, useChat } from './context/ChatContext'
 
 import LeftSidebar from './components/LeftSidebar'
 import Login from './components/Login'
+import SplashScreen from './components/SplashScreen'
 import AppointmentsView from './components/views/AppointmentsView'
 import DoctorsView from './components/views/DoctorsView'
 import HistoryView from './components/views/HistoryView'
@@ -20,6 +21,7 @@ export default function App() {
   const [user, setUser] = useState(null)
   const [userPhone, setUserPhone] = useState('')
   const [authLoading, setAuthLoading] = useState(true)
+  const [splashDone, setSplashDone] = useState(false)
 
   // Firebase Auth Listener
   useEffect(() => {
@@ -32,6 +34,22 @@ export default function App() {
     })
     return () => unsubscribe()
   }, [])
+
+  // Animated splash on open — doubles as the auth-loading screen.
+  // Signed-in users auto-dismiss into the app; everyone else gets a
+  // Get Started button that leads to the login page.
+  if (!splashDone) {
+    return (
+      <>
+        <Toaster position="top-right" />
+        <SplashScreen
+          ready={!authLoading}
+          autoDismiss={!authLoading && !!user}
+          onDone={() => setSplashDone(true)}
+        />
+      </>
+    )
+  }
 
   if (authLoading) {
     return <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center' }}>Loading...</div>
