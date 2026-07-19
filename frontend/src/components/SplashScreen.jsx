@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import VoiceOrb from './ui/VoiceOrb'
+import DnaHelix from './ui/DnaHelix'
 
 /**
  * Cinematic splash — the product thesis told in ~5 seconds:
@@ -8,8 +8,8 @@ import VoiceOrb from './ui/VoiceOrb'
  *   gather → the heartbeat MORPHS into the Voice Orb → brand reveal →
  *   tagline → languages → Get Started.
  *
- * Medicine becomes intelligence, and it speaks. The orb shown here is
- * the same VoiceOrb the user talks to inside the app.
+ * Medicine becomes intelligence, and it speaks. The ECG morphs into
+ * the DNA helix — the same living identity the user talks to inside.
  *
  * Returning (signed-in) users auto-continue without the button.
  */
@@ -257,9 +257,9 @@ export default function SplashScreen({ ready, autoDismiss, onDone }) {
           />
         ))}
 
-        {/* Act 4: the heartbeat becomes the Voice Orb */}
+        {/* Act 4: the heartbeat becomes the code of life */}
         <div className="cine__orb">
-          {showOrb && <VoiceOrb state="idle" size={150} label="SwasthyaAI assistant" />}
+          {showOrb && <DnaHelix state="idle" size={118} label="SwasthyaAI — living intelligence" />}
         </div>
       </div>
 

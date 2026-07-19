@@ -6,8 +6,8 @@ import {
 import { useState } from 'react'
 import { auth } from '../firebase'
 import Button from './ui/Button'
+import DnaHelix from './ui/DnaHelix'
 import LanguagePills from './ui/LanguagePills'
-import VoiceOrb from './ui/VoiceOrb'
 
 // deterministic particle field behind the hero orb
 const PARTICLES = Array.from({ length: 10 }, (_, i) => ({
@@ -81,7 +81,7 @@ export default function Login() {
           <div className="auth-logo">🫀 SwasthyaAI</div>
 
           <div className="auth-hero-orb">
-            <VoiceOrb state="idle" size={170} label="SwasthyaAI assistant, ready" />
+            <DnaHelix state="idle" size={150} label="SwasthyaAI assistant, ready" />
           </div>
 
           <h1 className="auth-hero-title">Talk to your healthcare&nbsp;companion</h1>

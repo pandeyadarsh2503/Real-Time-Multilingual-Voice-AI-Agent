@@ -64,19 +64,35 @@ Contrast: `--text-hi` on `--ink-900` ≈ 15:1; `--text-mid` ≈ 7:1 (AA+).
 | `LanguagePills` | EN/हिं/த sliding-thumb selector |
 | `EmptyState` | icon + title + action buttons — no blank screens |
 | `MetricCard` | one number + context; skeleton until real data |
-| `VoiceOrb` | the centerpiece — states idle/listening/thinking/speaking/muted/off; `getLevel()` makes it react to sound (rAF, GPU-only) |
+| `DnaHelix` | **the identity** — holographic double helix (see below) |
 | `Waveform` | flowing bezier ribbons (not bars); canvas + rAF, DPR-aware |
 
-## The Orb state contract
+## The DNA Helix — identity element
 
-| App state | Orb state |
+A holographic double helix: 9 rungs × 2 strands of glowing nodes with
+computed 3D depth (far side recedes and dims), particles travelling the
+strands, floating on a soft cyan bloom over a barely-there neural field.
+Healthcare + AI in one glyph: *your biology, understood by intelligence*.
+The splash's ECG heartbeat literally morphs into it.
+
+| App state | Helix behavior |
 |---|---|
-| connected, quiet | `idle` (4.2s breathing) |
-| capturing mic | `listening` (pulse + sonar) |
-| LLM/tools running | `thinking` (counter-rotating rings) |
-| TTS playing | `speaking` (fast waves) |
-| mic denied/off | `muted` (grey + slash) |
-| no session | `off` |
+| connected, quiet | `idle` — slow rotation, nodes breathe, particles drift |
+| capturing mic | `listening` — rotation eases, brightness up, a pulse climbs the helix, particles gather mid-strand, sonar rings, faint ECG flows behind |
+| LLM/tools running | `thinking` — neural sweep lights nodes & rungs sequentially, faster rotation, three orbiting motes (intelligence, not loading) |
+| TTS playing | `speaking` — rhythmic node energy synced to `getLevel()`, particles stream downward, fast waves |
+| booking confirmed | `success` — cyan→green, bottom-to-top pulse, gentle 12-particle burst, settles back (~1.7s) |
+| failure | `error` — rotation pauses, glow fades, one soft amber pulse; never alarming |
+| mic denied / no session | `muted` / `off` — dim grey, near-still |
+
+Micro-interactions: cursor parallax (±7° perspective tilt, smoothed),
+hover deepens the bloom, click fires a tap pulse (`onActivate`),
+voice level accelerates particles. `withWaveform` renders the ribbon
+waveform beneath for voice screens.
+
+Engine: one rAF writes SVG attributes via refs — zero React re-renders
+per frame; float/rings/ECG/field/tilt are separate composited CSS
+layers. Reduced motion: the loop stops, pose is static, glow only.
 
 ## Performance rules
 
