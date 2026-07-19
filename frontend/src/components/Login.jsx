@@ -78,16 +78,16 @@ export default function Login() {
           />
         ))}
         <div className="auth-hero-content">
+          <div className="auth-hero-orb">
+            <DnaHelix state="idle" size={108} label="SwasthyaAI assistant, ready" />
+          </div>
+
           <div className="auth-logo">🫀 SwasthyaAI</div>
 
           <h1 className="auth-hero-title">Talk to your healthcare&nbsp;companion</h1>
           <p className="auth-hero-subtitle">
             Book appointments, check availability and get voice reminders — just speak.
           </p>
-
-          <div className="auth-hero-orb">
-            <DnaHelix state="idle" size={108} label="SwasthyaAI assistant, ready" />
-          </div>
 
           <div className="auth-features">
             <div className="auth-feature-item">

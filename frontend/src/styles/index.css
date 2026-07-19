@@ -783,7 +783,8 @@ html, body {
 }
 
 .auth-hero-orb {
-  display: flex; justify-content: center; margin: 0;
+  display: flex; justify-content: flex-start; margin: 0;
+  padding-left: 8px;   /* optically aligns the helix with the wordmark */
   min-height: 0;
 }
 
