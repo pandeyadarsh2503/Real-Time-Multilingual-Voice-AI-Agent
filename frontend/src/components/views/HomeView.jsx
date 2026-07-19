@@ -11,29 +11,15 @@ export default function HomeView({ dashboardData, setActiveTab }) {
   const isDisabled = status === 'thinking' || status === 'speaking';
 
   return (
-    <div className="home-dashboard" style={{ display: 'flex', height: '100%', width: '100%', gap: '20px', padding: '20px 24px', background: '#f9fafb' }}>
+    <div className="home-dashboard" style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%', gap: '16px', padding: '18px 16px 18px 24px', background: '#f9fafb' }}>
 
-      {/* Center Column: Chat & Assistant */}
-      <div className="center-column" style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0 }}>
-        <header className="home-header" style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginBottom: '20px', alignItems: 'flex-start', flexShrink: 0 }}>
+      {/* Full-width header: greeting left, controls right */}
+      <header className="home-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px', flexShrink: 0 }}>
+        <div>
           <h1 style={{ fontSize: '24px', fontWeight: 'bold', color: '#111827', margin: 0 }}>Hello, {patientName} 👋</h1>
-          <p style={{ color: '#4b5563', margin: 0 }}>How can I help you today?</p>
-        </header>
-
-        <div className="chat-container-card" style={{ flex: 1, minHeight: 0, background: 'white', borderRadius: '16px', border: '1px solid #e5e7eb', display: 'flex', flexDirection: 'column' }}>
-          <ChatWindow messages={messages} isThinking={status === 'thinking'} />
-
-          <div style={{ padding: '0 20px 10px 20px' }}>
-            <VoiceInterface session={session} disabled={isDisabled} />
-          </div>
+          <p style={{ color: '#4b5563', margin: '4px 0 0' }}>How can I help you today?</p>
         </div>
-      </div>
-
-      {/* Right Column: Widgets */}
-      <div className="right-sidebar" style={{ width: '320px', display: 'flex', flexDirection: 'column', gap: '20px', flexShrink: 0, overflow: 'hidden' }}>
-
-        {/* Top Controls */}
-        <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
           <LanguagePills
             value={language}
             onChange={(code) => { setLanguage(code); localStorage.setItem('preferredLang', code); }}
@@ -42,7 +28,6 @@ export default function HomeView({ dashboardData, setActiveTab }) {
           <div className="online-badge" style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#ecfdf5', color: '#065f46', padding: '8px 12px', borderRadius: '20px', fontSize: '13px', fontWeight: '500' }}>
             <div style={{ width: '8px', height: '8px', background: '#10b981', borderRadius: '50%' }}></div> Online
           </div>
-
           <button
             onClick={() => setActiveTab('Profile')}
             title="My Profile"
@@ -50,12 +35,27 @@ export default function HomeView({ dashboardData, setActiveTab }) {
               width: '40px', height: '40px', borderRadius: '50%', background: '#3b82f6',
               display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem',
               color: 'white', cursor: 'pointer', boxShadow: '0 2px 5px rgba(59,130,246,0.3)',
-              fontWeight: 'bold', marginLeft: '5px', border: 'none',
+              fontWeight: 'bold', border: 'none',
             }}
           >
             {(patientName || 'G')[0].toUpperCase()}
           </button>
         </div>
+      </header>
+
+      {/* Chat + rail share the same top edge */}
+      <div style={{ display: 'flex', gap: '16px', flex: 1, minHeight: 0 }}>
+
+        <div className="chat-container-card" style={{ flex: 1, minWidth: 0, minHeight: 0, background: 'white', borderRadius: '16px', border: '1px solid #e5e7eb', display: 'flex', flexDirection: 'column' }}>
+          <ChatWindow messages={messages} isThinking={status === 'thinking'} />
+
+          <div style={{ padding: '0 20px 10px 20px' }}>
+            <VoiceInterface session={session} disabled={isDisabled} />
+          </div>
+        </div>
+
+        {/* Right Column: Widgets */}
+        <div className="right-sidebar" style={{ width: '300px', display: 'flex', flexDirection: 'column', gap: '16px', flexShrink: 0, overflowY: 'auto', minHeight: 0 }}>
 
         {/* Upcoming Appointment */}
         {dashboardData?.upcomingAppointment && (
@@ -137,6 +137,7 @@ export default function HomeView({ dashboardData, setActiveTab }) {
           </div>
         )}
 
+        </div>
       </div>
     </div>
   );
