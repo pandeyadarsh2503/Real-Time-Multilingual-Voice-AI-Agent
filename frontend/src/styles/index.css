@@ -781,8 +781,8 @@ html, body {
               linear-gradient(160deg, var(--ink-900) 0%, var(--ink-950) 100%);
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  padding: clamp(14px, 2.5vh, 36px) clamp(110px, 11vw, 190px) clamp(14px, 2.5vh, 36px) clamp(24px, 3vw, 48px);
+  justify-content: center;
+  padding: clamp(14px, 2.5vh, 36px) clamp(24px, 3vw, 48px);
   height: 100%;
   color: var(--text-hi);
   position: relative;
@@ -842,6 +842,12 @@ html, body {
   margin: 0;
 }
 
+.auth-hero-orb {
+  display: flex; justify-content: flex-start; margin: 0;
+  padding-left: 8px;   /* optically aligns the helix with the wordmark */
+  min-height: 0;
+}
+
 .auth-features {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -889,8 +895,8 @@ html, body {
   min-width: 0;
   display: flex;
   align-items: center;
-  justify-content: flex-start;
-  padding: clamp(16px, 3vh, 40px) clamp(16px, 3vw, 40px) clamp(16px, 3vh, 40px) clamp(56px, 5vw, 88px);
+  justify-content: center;
+  padding: clamp(16px, 3vh, 40px);
   height: 100%;
   overflow: hidden;
   background:
@@ -1048,33 +1054,6 @@ html, body {
   text-decoration: underline;
 }
 
-/* ── The engine: DNA at the seam between the two columns ── */
-.auth-core {
-  position: absolute;
-  left: 50%; top: 50%;
-  transform: translate(-50%, -50%);
-  z-index: 6;
-  display: grid;
-  place-items: center;
-  pointer-events: none;           /* never block the form */
-}
-.auth-core__glow {
-  position: absolute;
-  width: 145%; aspect-ratio: 1; border-radius: 50%;
-  background: radial-gradient(circle,
-    rgba(34, 211, 238, 0.13) 0%,
-    rgba(34, 211, 238, 0.045) 42%,
-    transparent 70%);
-}
-.auth-core__beam {
-  position: absolute;
-  width: 230%; height: 26%;
-  background: radial-gradient(ellipse at center,
-    rgba(34, 211, 238, 0.09) 0%,
-    rgba(34, 211, 238, 0.03) 45%,
-    transparent 72%);
-}
-
 /* Responsive adjustments */
 @media (max-width: 860px) {
   .auth-page-container {
@@ -1082,13 +1061,6 @@ html, body {
   }
   .auth-hero-section {
     display: none; /* Hide hero on small screens */
-  }
-  .auth-core {
-    display: none; /* single-column: the card stands alone */
-  }
-  .auth-form-section {
-    justify-content: center;
-    padding: 24px;
   }
   .auth-form-section {
     padding: 24px;
