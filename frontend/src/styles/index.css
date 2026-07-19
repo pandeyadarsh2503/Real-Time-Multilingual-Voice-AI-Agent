@@ -747,8 +747,9 @@ html, body {
 /* ── Authentication Pages (Night Ward) ──────────────────── */
 .auth-page-container {
   display: flex;
-  min-height: 100vh;
+  height: 100vh;
   width: 100%;
+  overflow: hidden;
   background: var(--ink-950);
   color: var(--text-hi);
 }
@@ -761,7 +762,8 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 40px;
+  padding: clamp(14px, 2.5vh, 36px) clamp(24px, 3vw, 48px);
+  height: 100%;
   color: var(--text-hi);
   position: relative;
   overflow: hidden;
@@ -781,74 +783,88 @@ html, body {
 }
 
 .auth-hero-orb {
-  display: flex; justify-content: center; margin-bottom: 36px;
+  display: flex; justify-content: center; margin: 0;
+  min-height: 0;
 }
 
 .auth-hero-content {
-  max-width: 500px;
+  max-width: 540px;
+  width: 100%;
+  max-height: 100%;
   position: relative;
   z-index: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: clamp(8px, 1.8vh, 20px);
 }
 
 .auth-logo {
-  font-size: 24px;
+  font-size: 19px;
   font-weight: 700;
-  margin-bottom: 60px;
+  font-family: var(--font-brand);
+  margin: 0;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 
 .auth-hero-title {
-  font-size: 42px;
+  font-size: clamp(24px, 2.8vh + 0.9vw, 38px);
   font-weight: 800;
-  line-height: 1.2;
-  margin-bottom: 24px;
+  font-family: var(--font-brand);
+  line-height: 1.15;
+  margin: 0;
   letter-spacing: -0.02em;
 }
 
 .auth-hero-subtitle {
-  font-size: 16px;
-  line-height: 1.6;
-  color: rgba(255,255,255,0.8);
-  margin-bottom: 48px;
+  font-size: clamp(13px, 1.7vh, 15px);
+  line-height: 1.5;
+  color: var(--text-mid);
+  margin: 0;
 }
 
 .auth-features {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: clamp(8px, 1.2vh, 12px);
 }
 
 .auth-feature-item {
   display: flex;
-  align-items: flex-start;
-  gap: 16px;
+  align-items: center;
+  gap: 10px;
+  padding: clamp(8px, 1.4vh, 12px) 12px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
 }
 
 .auth-feature-icon {
-  font-size: 24px;
-  background: var(--glass-bg);
-  border: 1px solid var(--glass-border);
-  width: 48px;
-  height: 48px;
+  font-size: 17px;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 12px;
-  backdrop-filter: blur(10px);
+  border-radius: 9px;
+  background: var(--cyan-dim);
 }
 
 .auth-feature-item h4 {
-  font-size: 16px;
+  font-size: 13px;
   font-weight: 600;
-  margin-bottom: 4px;
+  margin: 0 0 2px 0;
   font-family: var(--font-brand);
 }
 
 .auth-feature-item p {
-  font-size: 14px;
+  font-size: 11px;
+  line-height: 1.35;
   color: var(--text-mid);
+  margin: 0;
 }
 
 .auth-form-section {
@@ -856,7 +872,9 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 40px;
+  padding: clamp(16px, 3vh, 40px);
+  height: 100%;
+  overflow: hidden;
   background:
     radial-gradient(700px 500px at 80% 15%, rgba(13, 33, 66, 0.7) 0%, transparent 60%),
     var(--ink-950);
@@ -870,16 +888,18 @@ html, body {
   border-radius: 20px;
   backdrop-filter: blur(var(--glass-blur));
   -webkit-backdrop-filter: blur(var(--glass-blur));
-  padding: 36px;
+  padding: clamp(20px, 3vh, 32px);
   box-shadow: 0 24px 70px rgba(2, 8, 20, 0.55);
+  max-height: 100%;
+  overflow-y: auto;
 }
 
 .auth-lang-row {
-  display: flex; justify-content: flex-end; margin-bottom: 18px;
+  display: flex; justify-content: flex-end; margin-bottom: 12px;
 }
 
 .auth-form-header {
-  margin-bottom: 32px;
+  margin-bottom: clamp(12px, 2.2vh, 22px);
 }
 
 .auth-form-header h2 {
@@ -920,7 +940,7 @@ html, body {
 .auth-form {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: clamp(10px, 1.8vh, 16px);
 }
 
 .auth-input-group-row {
@@ -952,7 +972,7 @@ html, body {
 
 .auth-input {
   width: 100%;
-  padding: 14px 16px;
+  padding: clamp(10px, 1.6vh, 13px) 14px;
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-md);
   font-size: 15px;
@@ -989,7 +1009,7 @@ html, body {
 }
 
 .auth-toggle-text {
-  margin-top: 24px;
+  margin-top: clamp(12px, 2vh, 20px);
   text-align: center;
   font-size: 14px;
   color: var(--text-mid);

@@ -80,35 +80,42 @@ export default function Login() {
         <div className="auth-hero-content">
           <div className="auth-logo">🫀 SwasthyaAI</div>
 
-          <div className="auth-hero-orb">
-            <DnaHelix state="idle" size={150} label="SwasthyaAI assistant, ready" />
-          </div>
-
           <h1 className="auth-hero-title">Talk to your healthcare&nbsp;companion</h1>
           <p className="auth-hero-subtitle">
-            Book appointments, check availability and get voice reminders —
-            in English, Hindi or Tamil. Just speak.
+            Book appointments, check availability and get voice reminders — just speak.
           </p>
+
+          <div className="auth-hero-orb">
+            <DnaHelix state="idle" size={108} label="SwasthyaAI assistant, ready" />
+          </div>
+
           <div className="auth-features">
             <div className="auth-feature-item">
               <span className="auth-feature-icon">🎧</span>
               <div>
-                <h4>Live voice conversations</h4>
-                <p>Real-time speech with interruptions, like talking to a person.</p>
+                <h4>Live voice</h4>
+                <p>Real-time speech, interruptions included.</p>
               </div>
             </div>
             <div className="auth-feature-item">
               <span className="auth-feature-icon">📅</span>
               <div>
                 <h4>Smart scheduling</h4>
-                <p>Conflict-free bookings within each doctor's real hours.</p>
+                <p>Conflict-free, within real doctor hours.</p>
               </div>
             </div>
             <div className="auth-feature-item">
               <span className="auth-feature-icon">🔔</span>
               <div>
                 <h4>Reminder calls</h4>
-                <p>The assistant phones you before your appointment.</p>
+                <p>The assistant phones you beforehand.</p>
+              </div>
+            </div>
+            <div className="auth-feature-item">
+              <span className="auth-feature-icon">🌐</span>
+              <div>
+                <h4>Multilingual</h4>
+                <p>English · हिन्दी · தமிழ்</p>
               </div>
             </div>
           </div>
