@@ -2,9 +2,9 @@ import { useCallback, useState } from 'react'
 import { useChat } from '../context/ChatContext'
 
 /**
- * VoiceInterface — the input dock: Live toggle, push-to-talk mic, and
- * the text field. All voice logic lives in useVoiceSession (owned by
- * HomeView so the VoiceStage above shares the same session).
+ * VoiceInterface — the input dock: Live toggle, push-to-talk mic, text
+ * field, and the honest status line (live partials + the agent's real
+ * tool activity). Voice logic lives in useVoiceSession, owned by HomeView.
  */
 export default function VoiceInterface({ session, disabled }) {
   const { sendChatMessage } = useChat()
@@ -64,6 +64,12 @@ export default function VoiceInterface({ session, disabled }) {
         >
           ➤
         </button>
+      </div>
+
+      {/* One honest status line: live partial transcript, the agent's
+          real tool activity, or a gentle default */}
+      <div className="input-hint" aria-live="polite">
+        {session.statusLine || 'Go Live for a hands-free conversation, or use the mic / type 🛈'}
       </div>
     </div>
   )
