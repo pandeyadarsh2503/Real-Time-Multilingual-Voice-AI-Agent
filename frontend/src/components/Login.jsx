@@ -78,10 +78,6 @@ export default function Login() {
           />
         ))}
         <div className="auth-hero-content">
-          <div className="auth-hero-orb">
-            <DnaHelix state="idle" size={108} label="SwasthyaAI assistant, ready" />
-          </div>
-
           <div className="auth-logo">🫀 SwasthyaAI</div>
 
           <h1 className="auth-hero-title">Talk to your healthcare&nbsp;companion</h1>
@@ -217,6 +213,13 @@ export default function Login() {
             </button>
           </p>
         </div>
+      </div>
+
+      {/* ── The engine: DNA at the seam, powering both sides ── */}
+      <div className="auth-core" aria-hidden="false">
+        <span className="auth-core__beam" aria-hidden="true" />
+        <span className="auth-core__glow" aria-hidden="true" />
+        <DnaHelix state="idle" size={190} label="SwasthyaAI assistant, ready" />
       </div>
     </div>
   )

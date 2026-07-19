@@ -750,19 +750,21 @@ html, body {
   height: 100vh;
   width: 100%;
   overflow: hidden;
+  position: relative;
   background: var(--ink-950);
   color: var(--text-hi);
 }
 
 .auth-hero-section {
-  flex: 1;
+  flex: 0 0 50%;  /* basis 50% (border-box): padding cannot shift the seam */
+  min-width: 0;
   background: radial-gradient(900px 600px at 30% 20%, var(--ink-800) 0%, transparent 60%),
               radial-gradient(700px 500px at 80% 85%, rgba(6, 60, 80, 0.5) 0%, transparent 55%),
               linear-gradient(160deg, var(--ink-900) 0%, var(--ink-950) 100%);
   display: flex;
   align-items: center;
-  justify-content: center;
-  padding: clamp(14px, 2.5vh, 36px) clamp(24px, 3vw, 48px);
+  justify-content: flex-end;
+  padding: clamp(14px, 2.5vh, 36px) clamp(110px, 11vw, 190px) clamp(14px, 2.5vh, 36px) clamp(24px, 3vw, 48px);
   height: 100%;
   color: var(--text-hi);
   position: relative;
@@ -782,14 +784,10 @@ html, body {
   to   { transform: translate(26px, -34px); opacity: 0.15; }
 }
 
-.auth-hero-orb {
-  display: flex; justify-content: flex-start; margin: 0;
-  padding-left: 8px;   /* optically aligns the helix with the wordmark */
-  min-height: 0;
-}
+
 
 .auth-hero-content {
-  max-width: 540px;
+  max-width: 470px;
   width: 100%;
   max-height: 100%;
   position: relative;
@@ -869,11 +867,12 @@ html, body {
 }
 
 .auth-form-section {
-  flex: 1;
+  flex: 0 0 50%;  /* basis 50% (border-box): padding cannot shift the seam */
+  min-width: 0;
   display: flex;
   align-items: center;
-  justify-content: center;
-  padding: clamp(16px, 3vh, 40px);
+  justify-content: flex-start;
+  padding: clamp(16px, 3vh, 40px) clamp(16px, 3vw, 40px) clamp(16px, 3vh, 40px) clamp(56px, 5vw, 88px);
   height: 100%;
   overflow: hidden;
   background:
@@ -1031,6 +1030,34 @@ html, body {
   text-decoration: underline;
 }
 
+/* ── The engine: DNA at the seam between the two columns ── */
+.auth-core {
+  position: absolute;
+  left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 6;
+  display: grid;
+  place-items: center;
+  pointer-events: none;           /* never block the form */
+}
+.auth-core .dna { pointer-events: auto; }
+.auth-core__glow {
+  position: absolute;
+  width: 540px; height: 540px; border-radius: 50%;
+  background: radial-gradient(circle,
+    rgba(34, 211, 238, 0.14) 0%,
+    rgba(34, 211, 238, 0.05) 42%,
+    transparent 70%);
+}
+.auth-core__beam {
+  position: absolute;
+  width: 820px; height: 150px;
+  background: radial-gradient(ellipse at center,
+    rgba(34, 211, 238, 0.10) 0%,
+    rgba(34, 211, 238, 0.03) 45%,
+    transparent 72%);
+}
+
 /* Responsive adjustments */
 @media (max-width: 860px) {
   .auth-page-container {
@@ -1038,6 +1065,13 @@ html, body {
   }
   .auth-hero-section {
     display: none; /* Hide hero on small screens */
+  }
+  .auth-core {
+    display: none; /* single-column: the card stands alone */
+  }
+  .auth-form-section {
+    justify-content: center;
+    padding: 24px;
   }
   .auth-form-section {
     padding: 24px;
