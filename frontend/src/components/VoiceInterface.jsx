@@ -1,69 +1,15 @@
 import { useCallback, useState } from 'react'
-import toast from 'react-hot-toast'
 import { useChat } from '../context/ChatContext'
-import { useLiveVoice } from '../hooks/useLiveVoice'
-import { usePushToTalk } from '../hooks/usePushToTalk'
-import { voiceAPI } from '../services/api'
 
-export default function VoiceInterface({ disabled }) {
-  const {
-    status, setStatus, language, setLanguage,
-    sendChatMessage, handleUserMessage, handleAIResponse,
-  } = useChat()
-
+/**
+ * VoiceInterface — the input dock: Live toggle, push-to-talk mic, and
+ * the text field. All voice logic lives in useVoiceSession (owned by
+ * HomeView so the VoiceStage above shares the same session).
+ */
+export default function VoiceInterface({ session, disabled }) {
+  const { sendChatMessage } = useChat()
   const [textValue, setTextValue] = useState('')
-  const [partial, setPartial] = useState('')
-  const { isRecording, startRecording, stopRecording } = usePushToTalk()
-
-  // ── Live streaming conversation (WebRTC) ────────────────
-  const liveVoice = useLiveVoice({
-    onPartial: setPartial,
-    onFinal: (text, lang) => {
-      if (lang) setLanguage(lang)
-      handleUserMessage(text, lang || language)
-    },
-    onAgentResponse: (text, lang) => handleAIResponse(text, lang || language),
-    onState: (state) => setStatus(state === 'ready' ? 'ready' : state),
-    onError: (msg) => toast.error(msg),
-  })
-
-  const toggleLive = useCallback(() => {
-    setPartial('')
-    if (liveVoice.live) liveVoice.stop()
-    else liveVoice.start()
-  }, [liveVoice])
-
-  // ── Push-to-talk (record → upload) fallback ─────────────
-  const handleMic = useCallback(async () => {
-    if (disabled || liveVoice.live) return
-
-    if (!isRecording) {
-      const ok = await startRecording()
-      if (ok) setStatus('listening')
-      else toast.error('Microphone access was denied.')
-    } else {
-      const blob = await stopRecording()
-      if (!blob) return
-      setStatus('thinking')
-
-      try {
-        const sttRes = await voiceAPI.stt(blob, language)
-        const { text, language: detectedLang } = sttRes.data
-
-        if (!text.trim()) {
-          toast('No speech detected — please try again.', { icon: '🎤' })
-          setStatus('ready')
-          return
-        }
-        if (detectedLang) setLanguage(detectedLang)
-
-        await sendChatMessage(text)
-      } catch (err) {
-        toast.error(err.response?.data?.detail || 'Transcription failed. Please try again.')
-        setStatus('ready')
-      }
-    }
-  }, [disabled, liveVoice.live, isRecording, startRecording, stopRecording, language, setLanguage, sendChatMessage, setStatus])
+  const { live, connecting, isRecording, toggleLive, handleMic } = session
 
   const handleTextSend = useCallback(async () => {
     const text = textValue.trim()
@@ -76,33 +22,25 @@ export default function VoiceInterface({ disabled }) {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleTextSend() }
   }
 
-  const hint = liveVoice.live
-    ? (partial ? `“${partial}…”` : '🎧 Live conversation — just speak naturally')
-    : liveVoice.connecting
-      ? 'Connecting live voice…'
-      : status === 'thinking' ? 'Thinking...'
-        : status === 'speaking' ? 'Speaking...'
-          : 'Go Live for a hands-free conversation, or use the mic / type 🛈'
-
   return (
     <div className="input-overlay">
       <div className="input-pill-container">
 
         {/* Live conversation toggle */}
         <button
-          className={`mic-inline-btn ${liveVoice.live ? 'recording' : ''}`}
+          className={`mic-inline-btn ${live ? 'recording' : ''}`}
           onClick={toggleLive}
-          disabled={liveVoice.connecting}
-          title={liveVoice.live ? 'End live conversation' : 'Start live conversation'}
+          disabled={connecting}
+          title={live ? 'End live conversation' : 'Start live conversation'}
         >
-          {liveVoice.connecting ? '⏳' : liveVoice.live ? '🔴' : '🎧'}
+          {connecting ? '⏳' : live ? '🔴' : '🎧'}
         </button>
 
         {/* Push-to-talk mic */}
         <button
           className={`mic-inline-btn ${isRecording ? 'recording' : ''}`}
           onClick={handleMic}
-          disabled={disabled || liveVoice.live}
+          disabled={disabled || live}
           title="Push-to-talk"
         >
           {isRecording ? '⏹' : '🎤'}
@@ -111,23 +49,22 @@ export default function VoiceInterface({ disabled }) {
         {/* Text input */}
         <input
           className="input-field"
-          placeholder={liveVoice.live ? 'Live conversation in progress…' : 'Type your message...'}
+          placeholder={live ? 'Live conversation in progress…' : 'Type your message...'}
           value={textValue}
           onChange={(e) => setTextValue(e.target.value)}
           onKeyDown={onKeyDown}
-          disabled={disabled || isRecording || liveVoice.live}
+          disabled={disabled || isRecording || live}
         />
 
-        {/* Send Icon */}
+        {/* Send */}
         <button
           className="input-send"
           onClick={handleTextSend}
-          disabled={!textValue.trim() || disabled || isRecording || liveVoice.live}
+          disabled={!textValue.trim() || disabled || isRecording || live}
         >
           ➤
         </button>
       </div>
-      <div className="input-hint">{hint}</div>
     </div>
   )
 }

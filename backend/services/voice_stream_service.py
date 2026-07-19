@@ -301,6 +301,9 @@ class VoiceSession:
                         user=self.user,
                         lang=lang,
                         db=db,
+                        # stream "what the agent is doing" to the client so the
+                        # UI can show intelligent progress instead of a spinner
+                        on_tool=lambda name: self.send_event({"type": "tool", "name": name}),
                     )
                 finally:
                     db.close()

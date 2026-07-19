@@ -36,9 +36,17 @@ export function ChatProvider({ user, children }) {
     addMessage('user', text, lang)
   }, [addMessage])
 
+  // Fires the helix's green celebration when a REAL booking lands:
+  // agent confirmations carry the 8-char appointment id (e.g. "ID: 7C7A2598").
+  const [celebration, setCelebration] = useState(0)
+  const [mishap, setMishap] = useState(0)
+
   const handleAIResponse = useCallback((text, lang) => {
     addMessage('assistant', text, lang)
     if (lang) setLanguage(lang)
+    if (/\b[A-F0-9]{8}\b/.test(text) && /\b(booked|confirmed|rescheduled)\b/i.test(text)) {
+      setCelebration((c) => c + 1)
+    }
   }, [addMessage])
 
   const playAudio = useCallback(async (text, lang) => {
@@ -76,6 +84,7 @@ export function ChatProvider({ user, children }) {
       const errMsg = err.response?.data?.detail || 'Something went wrong. Please try again.'
       toast.error(errMsg)
       handleAIResponse(errMsg, language)
+      setMishap((m) => m + 1)   // helix shows the calm amber error state
       setStatus('ready')
     }
   }, [sessionId, patientName, language, handleUserMessage, handleAIResponse, playAudio])
@@ -104,6 +113,8 @@ export function ChatProvider({ user, children }) {
     sendChatMessage,
     handleUserMessage,
     handleAIResponse,
+    celebration,
+    mishap,
   }
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>

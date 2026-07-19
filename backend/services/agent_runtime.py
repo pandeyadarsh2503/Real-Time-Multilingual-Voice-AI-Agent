@@ -37,13 +37,20 @@ REQUIRED_ARGS = {
 }
 
 
-def build_tool_executor(db: Session, user: dict, patient_name: str | None, lang: str):
-    """Tool dispatcher bound to this request's DB session and verified user."""
+def build_tool_executor(db: Session, user: dict, patient_name: str | None, lang: str, on_tool=None):
+    """Tool dispatcher bound to this request's DB session and verified user.
+    `on_tool(name)` fires before each execution — live voice sessions use
+    it to stream 'what the agent is doing' to the client."""
 
     async def tool_executor(tool_name: str, args: dict):
         required = REQUIRED_ARGS.get(tool_name)
         if required is None:
             return {"error": f"Unknown tool: {tool_name}"}
+        if on_tool is not None:
+            try:
+                on_tool(tool_name)
+            except Exception:
+                logger.debug("on_tool callback failed", exc_info=True)
         missing = [k for k in required if not args.get(k)]
         if missing:
             return {"error": f"Missing required arguments: {', '.join(missing)}. Ask the user for them."}
@@ -84,6 +91,7 @@ async def run_chat_turn(
     user: dict,
     lang: str,
     db: Session,
+    on_tool=None,
 ) -> str:
     """
     One full conversational turn. Session keys are scoped to the
@@ -106,7 +114,7 @@ async def run_chat_turn(
     await append_to_session(session_key, {"role": "user", "content": user_text}, db)
     persist_text(session_key, "user", message, db)
 
-    tool_executor = build_tool_executor(db, user, patient_name, lang)
+    tool_executor = build_tool_executor(db, user, patient_name, lang, on_tool=on_tool)
     current_messages = await get_session(session_key, db)
     response_text, updated = await run_agent(current_messages, tool_executor)
 

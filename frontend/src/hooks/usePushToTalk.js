@@ -91,5 +91,17 @@ export function usePushToTalk() {
     return data
   }, [])
 
-  return { isRecording, startRecording, stopRecording, getWaveformData }
+  /** 0..1 microphone energy — same contract as useLiveVoice.getLevel. */
+  const getLevel = useCallback(() => {
+    const data = getWaveformData()
+    if (!data) return 0
+    let sum = 0
+    for (let i = 0; i < data.length; i++) {
+      const v = (data[i] - 128) / 128
+      sum += v * v
+    }
+    return Math.min(1, Math.sqrt(sum / data.length) * 3.2)
+  }, [getWaveformData])
+
+  return { isRecording, startRecording, stopRecording, getWaveformData, getLevel }
 }
