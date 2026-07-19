@@ -1,5 +1,314 @@
-/* ── Reset & Tokens ─────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════
+   SwasthyaAI Design System 2.0 — "Night Ward"
+   Deep-navy clinical dark theme. Cyan is reserved for the AI's
+   presence; semantic colors only for semantic meaning.
+   Full documentation: frontend/DESIGN.md
+   ═══════════════════════════════════════════════════════════ */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  /* ── Surfaces (deep navy → dark blue) ── */
+  --ink-950: #050b18;
+  --ink-900: #081226;
+  --ink-850: #0a1730;
+  --ink-800: #0d1d3d;
+  --ink-700: #14264c;
+
+  /* ── The AI accent (medical cyan / soft aqua) ── */
+  --cyan-500: #06b6d4;
+  --cyan-400: #22d3ee;
+  --aqua-300: #67e8f9;
+  --cyan-glow: rgba(34, 211, 238, 0.35);
+  --cyan-dim:  rgba(34, 211, 238, 0.12);
+
+  /* ── Semantic ── */
+  --ok:      #34d399;
+  --warn:    #fbbf24;
+  --danger:  #f87171;
+  --ok-dim:     rgba(52, 211, 153, 0.14);
+  --warn-dim:   rgba(251, 191, 36, 0.14);
+  --danger-dim: rgba(248, 113, 113, 0.14);
+
+  /* ── Text on dark ── */
+  --text-hi:  #eaf2ff;
+  --text-mid: #9fb3d1;
+  --text-low: #5d7397;
+
+  /* ── Glass ── */
+  --glass-bg:       rgba(148, 197, 255, 0.055);
+  --glass-bg-hover: rgba(148, 197, 255, 0.09);
+  --glass-border:   rgba(148, 197, 255, 0.14);
+  --glass-blur:     18px;
+
+  /* ── Type ── */
+  --font-body:     'Inter', system-ui, sans-serif;
+  --font-brand:    'Space Grotesk', 'Inter', sans-serif;
+
+  /* ── Spacing (4px scale) ── */
+  --sp-1: 4px;  --sp-2: 8px;  --sp-3: 12px; --sp-4: 16px;
+  --sp-5: 20px; --sp-6: 24px; --sp-8: 32px; --sp-10: 40px; --sp-12: 48px;
+
+  /* ── Motion: duration = weight of the change; easing = its character ── */
+  --dur-fast: 150ms;   /* hover, focus            */
+  --dur-med:  300ms;   /* cards, dialogs, reveals */
+  --dur-slow: 600ms;   /* page/scene transitions  */
+  --ease-swift:  cubic-bezier(0.22, 1, 0.36, 1);   /* decisive arrivals   */
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);/* playful pops        */
+  --ease-breathe: cubic-bezier(0.45, 0, 0.55, 1);  /* organic, living     */
+}
+
+/* ── Accessibility base ── */
+:focus-visible {
+  outline: 2px solid var(--cyan-400);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ═══ UI KIT ════════════════════════════════════════════════ */
+
+/* ── Glass card ── */
+.glass-card {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  transition: transform var(--dur-med) var(--ease-swift),
+              background var(--dur-med) var(--ease-swift),
+              box-shadow var(--dur-med) var(--ease-swift);
+}
+.glass-card.floaty:hover {
+  transform: translateY(-3px);
+  background: var(--glass-bg-hover);
+  box-shadow: 0 14px 40px rgba(2, 8, 20, 0.5);
+}
+
+/* ── Buttons ── */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  font-family: var(--font-body); font-weight: 600; cursor: pointer;
+  border: 1px solid transparent; border-radius: 12px;
+  transition: transform var(--dur-fast) var(--ease-swift),
+              box-shadow var(--dur-fast) var(--ease-swift),
+              background var(--dur-fast) var(--ease-swift),
+              opacity var(--dur-fast) ease;
+  white-space: nowrap; user-select: none;
+}
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn:not(:disabled):hover  { transform: translateY(-1px); }
+.btn:not(:disabled):active { transform: translateY(0) scale(0.98); }
+.btn--md { padding: 11px 20px; font-size: 14px; }
+.btn--lg { padding: 14px 28px; font-size: 16px; }
+.btn--sm { padding: 7px 14px;  font-size: 13px; }
+.btn--primary {
+  color: #04222b;
+  background: linear-gradient(135deg, var(--aqua-300), var(--cyan-500));
+  box-shadow: 0 4px 18px rgba(6, 182, 212, 0.3);
+}
+.btn--primary:not(:disabled):hover { box-shadow: 0 8px 28px rgba(6, 182, 212, 0.45); }
+.btn--glass {
+  color: var(--text-hi);
+  background: var(--glass-bg);
+  border-color: var(--glass-border);
+  backdrop-filter: blur(8px);
+}
+.btn--glass:not(:disabled):hover { background: var(--glass-bg-hover); }
+.btn--ghost { color: var(--text-mid); background: transparent; }
+.btn--ghost:not(:disabled):hover { color: var(--text-hi); background: var(--glass-bg); }
+.btn--danger {
+  color: #fecaca; background: var(--danger-dim);
+  border-color: rgba(248, 113, 113, 0.35);
+}
+.btn--danger:not(:disabled):hover { background: rgba(248, 113, 113, 0.22); }
+
+.btn__spinner {
+  width: 16px; height: 16px; border-radius: 50%;
+  border: 2px solid rgba(255,255,255,0.35); border-top-color: currentColor;
+  animation: spin 0.8s linear infinite;
+}
+
+/* ── Skeleton shimmer ── */
+.skeleton {
+  position: relative; overflow: hidden;
+  background: rgba(148, 197, 255, 0.07);
+  border-radius: 8px;
+}
+.skeleton::after {
+  content: ''; position: absolute; inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(148, 197, 255, 0.12), transparent);
+  animation: shimmer 1.6s var(--ease-breathe) infinite;
+}
+@keyframes shimmer { 100% { transform: translateX(100%); } }
+
+/* ── Dialog ── */
+.dialog-backdrop {
+  position: fixed; inset: 0; z-index: 9000;
+  background: rgba(4, 9, 20, 0.65);
+  backdrop-filter: blur(6px);
+  display: flex; align-items: center; justify-content: center;
+  animation: fadeIn var(--dur-med) ease forwards;
+  padding: 20px;
+}
+.dialog-panel {
+  background: linear-gradient(165deg, var(--ink-800), var(--ink-900));
+  border: 1px solid var(--glass-border);
+  border-radius: 20px;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
+  width: 100%; max-width: 480px; max-height: 88vh; overflow-y: auto;
+  color: var(--text-hi);
+  animation: dialogIn var(--dur-med) var(--ease-spring) forwards;
+}
+@keyframes dialogIn {
+  from { opacity: 0; transform: scale(0.92) translateY(10px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* ── Language pills ── */
+.lang-pills {
+  position: relative; display: inline-flex; gap: 2px;
+  background: var(--glass-bg); border: 1px solid var(--glass-border);
+  border-radius: 999px; padding: 3px;
+}
+.lang-pills__thumb {
+  position: absolute; top: 3px; bottom: 3px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--cyan-dim), rgba(34, 211, 238, 0.22));
+  border: 1px solid rgba(34, 211, 238, 0.4);
+  transition: left var(--dur-med) var(--ease-swift), width var(--dur-med) var(--ease-swift);
+}
+.lang-pills button {
+  position: relative; z-index: 1;
+  border: none; background: transparent; cursor: pointer;
+  padding: 6px 14px; border-radius: 999px;
+  font-size: 13px; font-weight: 600; color: var(--text-mid);
+  transition: color var(--dur-fast) ease;
+  font-family: var(--font-body);
+}
+.lang-pills button[aria-pressed="true"] { color: var(--aqua-300); }
+.lang-pills button:hover { color: var(--text-hi); }
+
+/* ── Empty state ── */
+.empty-state {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  text-align: center; padding: 48px 24px; gap: 10px;
+}
+.empty-state__icon  { font-size: 44px; opacity: 0.85; }
+.empty-state__title { font-family: var(--font-brand); font-size: 18px; font-weight: 600; color: var(--text-hi); }
+.empty-state__desc  { font-size: 14px; color: var(--text-mid); max-width: 340px; line-height: 1.55; }
+.empty-state__actions { display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; justify-content: center; }
+
+/* ── Metric card ── */
+.metric-card { padding: 18px 20px; display: flex; flex-direction: column; gap: 6px; }
+.metric-card__label { font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-low); }
+.metric-card__value { font-family: var(--font-brand); font-size: 28px; font-weight: 700; color: var(--text-hi); line-height: 1.1; }
+.metric-card__hint  { font-size: 12px; color: var(--text-mid); }
+
+/* ═══ VOICE ORB ═════════════════════════════════════════════
+   The centerpiece. Layered CSS: core sphere + aura + ripples +
+   rotating rings. All transform/opacity → GPU-composited 60fps.
+   States: idle | listening | thinking | speaking | muted | off  */
+.orb { position: relative; display: grid; place-items: center; }
+.orb, .orb * { pointer-events: none; }
+
+.orb__core {
+  position: relative; z-index: 3;
+  width: 58%; height: 58%; border-radius: 50%;
+  background:
+    radial-gradient(circle at 32% 28%, rgba(255,255,255,0.85) 0%, transparent 22%),
+    radial-gradient(circle at 50% 45%, var(--aqua-300) 0%, var(--cyan-500) 42%, #0b4b6e 78%, #072c44 100%);
+  box-shadow:
+    0 0 40px var(--cyan-glow),
+    0 0 90px rgba(34, 211, 238, 0.18),
+    inset 0 -14px 30px rgba(4, 30, 48, 0.55);
+  transition: transform 90ms ease-out, filter var(--dur-med) ease, box-shadow var(--dur-med) ease;
+}
+.orb__aura {
+  position: absolute; z-index: 1; inset: 6%;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--cyan-dim) 0%, transparent 65%);
+  transition: opacity var(--dur-med) ease;
+}
+.orb__ring {
+  position: absolute; z-index: 2; border-radius: 50%;
+  border: 1.5px solid transparent;
+  opacity: 0; transition: opacity var(--dur-med) ease;
+}
+.orb__ring--a { inset: 2%;  border-top-color: var(--cyan-400); border-right-color: rgba(34,211,238,0.25); }
+.orb__ring--b { inset: 10%; border-bottom-color: var(--aqua-300); border-left-color: rgba(103,232,249,0.2); }
+.orb__ripple {
+  position: absolute; z-index: 0; inset: 18%;
+  border-radius: 50%; border: 1.5px solid var(--cyan-400);
+  opacity: 0; transform: scale(0.7);
+}
+.orb__slash {
+  position: absolute; z-index: 4; width: 68%; height: 3px; border-radius: 2px;
+  background: #8b9bb4; transform: rotate(-45deg) scaleX(0);
+  transition: transform var(--dur-med) var(--ease-swift);
+}
+
+/* state: idle — slow breathing */
+.orb[data-state="idle"] .orb__core { animation: orbBreathe 4.2s var(--ease-breathe) infinite; }
+.orb[data-state="idle"] .orb__aura { opacity: 0.8; animation: orbBreathe 4.2s var(--ease-breathe) infinite; }
+@keyframes orbBreathe {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.055); }
+}
+
+/* state: listening — attentive pulse + sonar ripples */
+.orb[data-state="listening"] .orb__core { animation: orbAlert 1.6s var(--ease-breathe) infinite; }
+.orb[data-state="listening"] .orb__ripple { animation: orbSonar 1.8s ease-out infinite; }
+.orb[data-state="listening"] .orb__ripple:nth-child(2) { animation-delay: 0.6s; }
+.orb[data-state="listening"] .orb__ripple:nth-child(3) { animation-delay: 1.2s; }
+@keyframes orbAlert {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.04); }
+}
+@keyframes orbSonar {
+  0%   { opacity: 0.7; transform: scale(0.75); }
+  100% { opacity: 0;   transform: scale(1.55); }
+}
+
+/* state: thinking — rotating rings, dimmed core */
+.orb[data-state="thinking"] .orb__core { filter: saturate(0.8) brightness(0.92); }
+.orb[data-state="thinking"] .orb__ring { opacity: 1; }
+.orb[data-state="thinking"] .orb__ring--a { animation: spin 1.5s linear infinite; }
+.orb[data-state="thinking"] .orb__ring--b { animation: spinRev 2.3s linear infinite; }
+@keyframes spin    { to { transform: rotate(360deg); } }
+@keyframes spinRev { to { transform: rotate(-360deg); } }
+
+/* state: speaking — expanding sound waves */
+.orb[data-state="speaking"] .orb__core { animation: orbTalk 0.85s var(--ease-breathe) infinite; }
+.orb[data-state="speaking"] .orb__ripple { animation: orbSonar 1s ease-out infinite; }
+.orb[data-state="speaking"] .orb__ripple:nth-child(2) { animation-delay: 0.33s; }
+.orb[data-state="speaking"] .orb__ripple:nth-child(3) { animation-delay: 0.66s; }
+@keyframes orbTalk {
+  0%, 100% { transform: scale(1); }
+  30%      { transform: scale(1.07); }
+  60%      { transform: scale(1.02); }
+}
+
+/* states: muted / off */
+.orb[data-state="muted"] .orb__core,
+.orb[data-state="off"]   .orb__core {
+  filter: grayscale(0.9) brightness(0.55);
+  box-shadow: 0 0 24px rgba(120, 140, 170, 0.15), inset 0 -14px 30px rgba(10, 16, 28, 0.6);
+  animation: none;
+}
+.orb[data-state="muted"] .orb__slash { transform: rotate(-45deg) scaleX(1); }
+.orb[data-state="off"] .orb__aura { opacity: 0.15; }
+
+/* ── Live waveform canvas ── */
+.waveform-canvas { display: block; width: 100%; height: 100%; }
+
 
 :root {
   --bg-body:      #f9fafb; /* App window background outside the main paper */
