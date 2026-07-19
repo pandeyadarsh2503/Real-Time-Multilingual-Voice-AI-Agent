@@ -11,6 +11,7 @@ import Login from './components/Login'
 import SplashScreen from './components/SplashScreen'
 import AppointmentsView from './components/views/AppointmentsView'
 import DoctorsView from './components/views/DoctorsView'
+import HealthSummaryView from './components/views/HealthSummaryView'
 import HistoryView from './components/views/HistoryView'
 import HomeView from './components/views/HomeView'
 import ProfileView from './components/views/ProfileView'
@@ -110,7 +111,6 @@ function AuthedApp({ user, userPhone }) {
           name: d.name,
           specialty: d.specialty,
           icon: d.icon,
-          imgUrl: `https://ui-avatars.com/api/?name=${encodeURIComponent(d.name)}&background=random`,
         }))
 
         setDashboardData((prev) => ({ ...prev, upcomingAppointment, recentDoctors: docs }))
@@ -153,6 +153,8 @@ function AuthedApp({ user, userPhone }) {
         return <DoctorsView onBook={(docName) => chatHandoff(`I want to book an appointment with ${docName}`)} />
       case 'History':
         return <HistoryView />
+      case 'Health':
+        return <HealthSummaryView onTalk={() => setActiveTab('Home')} />
       case 'Profile':
         return <ProfileView user={user} />
       case 'Settings':

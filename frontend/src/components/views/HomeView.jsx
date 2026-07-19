@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useChat } from '../../context/ChatContext';
 import { useVoiceSession } from '../../hooks/useVoiceSession';
 import ChatWindow from '../ChatWindow';
@@ -30,7 +30,6 @@ export default function HomeView({ dashboardData, setActiveTab }) {
   const { patientName, messages, status, language, setLanguage, sendChatMessage } = useChat();
   const session = useVoiceSession();
   const isDisabled = status === 'thinking' || status === 'speaking';
-  const [showProfileMenu, setShowProfileMenu] = useState(false);
 
   return (
     <div className="home-dashboard" style={{ display: 'flex', height: '100%', width: '100%', gap: '32px', padding: '32px 48px', background: '#f9fafb' }}>
@@ -67,44 +66,18 @@ export default function HomeView({ dashboardData, setActiveTab }) {
             <div style={{ width: '8px', height: '8px', background: '#10b981', borderRadius: '50%' }}></div> Online
           </div>
 
-          <div style={{ position: 'relative' }}>
-            <div
-              onClick={() => setShowProfileMenu(!showProfileMenu)}
-              style={{
-                width: '40px', height: '40px', borderRadius: '50%', background: '#3b82f6',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem',
-                color: 'white', cursor: 'pointer', boxShadow: '0 2px 5px rgba(59,130,246,0.3)',
-                fontWeight: 'bold', marginLeft: '5px',
-              }}
-            >
-              {(patientName || 'G')[0].toUpperCase()}
-            </div>
-
-            {showProfileMenu && (
-              <div style={{
-                position: 'absolute', top: '50px', right: '0', background: 'white',
-                border: '1px solid #e5e7eb', borderRadius: '12px', boxShadow: '0 4px 15px rgba(0,0,0,0.1)',
-                padding: '8px 0', width: '150px', zIndex: 1000, display: 'flex', flexDirection: 'column',
-              }}>
-                <button
-                  onClick={() => { setShowProfileMenu(false); setActiveTab('Profile'); }}
-                  style={{ padding: '10px 16px', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', fontSize: '14px', color: '#1f2937', fontWeight: '500' }}
-                  onMouseEnter={(e) => e.target.style.background = '#f9fafb'}
-                  onMouseLeave={(e) => e.target.style.background = 'none'}
-                >
-                  👤 My Profile
-                </button>
-                <button
-                  onClick={() => { setShowProfileMenu(false); setActiveTab('Settings'); }}
-                  style={{ padding: '10px 16px', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', fontSize: '14px', color: '#1f2937', fontWeight: '500' }}
-                  onMouseEnter={(e) => e.target.style.background = '#f9fafb'}
-                  onMouseLeave={(e) => e.target.style.background = 'none'}
-                >
-                  ⚙️ Settings
-                </button>
-              </div>
-            )}
-          </div>
+          <button
+            onClick={() => setActiveTab('Profile')}
+            title="My Profile"
+            style={{
+              width: '40px', height: '40px', borderRadius: '50%', background: '#3b82f6',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem',
+              color: 'white', cursor: 'pointer', boxShadow: '0 2px 5px rgba(59,130,246,0.3)',
+              fontWeight: 'bold', marginLeft: '5px', border: 'none',
+            }}
+          >
+            {(patientName || 'G')[0].toUpperCase()}
+          </button>
         </div>
 
         {/* Upcoming Appointment */}
@@ -136,10 +109,10 @@ export default function HomeView({ dashboardData, setActiveTab }) {
                   key={action.id}
                   className="action-box-new"
                   onClick={() => sendChatMessage(action.prompt)}
-                  style={{ background: action.bgColor, border: 'none', borderRadius: '12px', padding: '10px', display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'flex-start', cursor: 'pointer', textAlign: 'left', minWidth: 0 }}
+                  style={{ background: action.bgColor, border: 'none', borderRadius: '14px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'flex-start', cursor: 'pointer', textAlign: 'left', minWidth: 0 }}
                 >
-                  <span style={{ color: action.iconColor, fontSize: '20px' }}>{action.icon}</span>
-                  <span style={{ fontSize: '11px', fontWeight: '600', color: '#0f172a', lineHeight: 1.2, wordBreak: 'break-word', width: '100%' }}>{action.title}</span>
+                  <span style={{ width: '34px', height: '34px', borderRadius: '9px', background: 'rgba(255,255,255,0.75)', display: 'grid', placeItems: 'center', color: action.iconColor, fontSize: '17px' }}>{action.icon}</span>
+                  <span style={{ fontSize: '12.5px', fontWeight: '600', color: '#1f2937', lineHeight: 1.3, wordBreak: 'break-word', width: '100%' }}>{action.title}</span>
                 </button>
               ))}
             </div>
@@ -149,35 +122,40 @@ export default function HomeView({ dashboardData, setActiveTab }) {
         {/* Explore Doctors */}
         {dashboardData?.recentDoctors?.length > 0 && (
           <div className="widget-card" style={{ background: 'white', borderRadius: '16px', padding: '20px', border: '1px solid #e5e7eb' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '15px', color: '#1f2937', fontWeight: '600', fontSize: '14px' }}>
-              Explore Doctors
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '15px' }}>
+              <span style={{ color: '#1f2937', fontWeight: '600', fontSize: '14px' }}>Explore Doctors</span>
+              <button
+                onClick={() => setActiveTab('Doctors')}
+                style={{ background: 'none', border: 'none', color: '#3b82f6', fontSize: '13px', fontWeight: '600', cursor: 'pointer', padding: 0 }}
+              >
+                View all
+              </button>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-              {dashboardData.recentDoctors.slice(0, 3).map((doc, index) => (
-                <React.Fragment key={doc.id}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }} onClick={() => sendChatMessage(`I want to book an appointment with ${doc.name}`)}>
-                    <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                      <img src={doc.imgUrl} style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover', background: '#e2e8f0' }} alt={doc.name} />
-                      <div>
-                        <div style={{ fontWeight: '600', color: '#111827', fontSize: '14px' }}>{doc.name}</div>
-                        <div style={{ color: '#6b7280', fontSize: '12px' }}>{doc.specialty}</div>
+              {dashboardData.recentDoctors.slice(0, 3).map((doc, index) => {
+                const palette = [['#e7f0ff', '#2563eb'], ['#f1e9ff', '#7c3aed'], ['#fff1e6', '#ea580c'], ['#e7f8ef', '#16a34a']];
+                const [bg, fg] = palette[index % palette.length];
+                const initials = doc.name.replace(/^Dr\.?\s*/i, '').split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase();
+                return (
+                  <React.Fragment key={doc.id}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }} onClick={() => sendChatMessage(`I want to book an appointment with ${doc.name}`)}>
+                      <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                        <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: bg, color: fg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700', fontSize: '13px' }}>
+                          {initials}
+                        </div>
+                        <div>
+                          <div style={{ fontWeight: '600', color: '#111827', fontSize: '14px' }}>{doc.name}</div>
+                          <div style={{ color: '#6b7280', fontSize: '12px' }}>{doc.specialty}</div>
+                        </div>
                       </div>
+                      <span style={{ color: '#94a3b8' }}>›</span>
                     </div>
-                    <span style={{ color: '#1e3a8a' }}>›</span>
-                  </div>
-                  {index < 2 && index < dashboardData.recentDoctors.length - 1 && (
-                    <div style={{ height: '1px', background: '#f3f4f6' }}></div>
-                  )}
-                </React.Fragment>
-              ))}
-              {dashboardData.recentDoctors.length > 3 && (
-                <button
-                  onClick={() => setActiveTab('Doctors')}
-                  style={{ marginTop: '5px', width: '100%', background: '#f8fafc', color: '#3b82f6', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '10px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', transition: 'all 0.2s' }}
-                >
-                  See all doctors
-                </button>
-              )}
+                    {index < 2 && index < dashboardData.recentDoctors.length - 1 && (
+                      <div style={{ height: '1px', background: '#f3f4f6' }}></div>
+                    )}
+                  </React.Fragment>
+                );
+              })}
             </div>
           </div>
         )}

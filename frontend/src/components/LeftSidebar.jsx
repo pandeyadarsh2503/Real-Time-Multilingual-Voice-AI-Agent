@@ -1,50 +1,81 @@
 import React from 'react';
 
-export default function LeftSidebar({ activeTab, setActiveTab, onLogout }) {
-  const tabs = [
-    { id: 'Home', label: 'Home' },
-    { id: 'Appointments', label: 'Appointments' },
-    { id: 'Doctors', label: 'Doctors' },
-    { id: 'History', label: 'History' },
-  ];
+// line icons, stroke = currentColor
+const Ic = {
+  home: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="m3 10.5 9-7.5 9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9.5"/></svg>,
+  calendar: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><rect x="3.5" y="5" width="17" height="16" rx="2.5"/><path d="M8 3v4M16 3v4M3.5 10.5h17"/></svg>,
+  users: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M2.8 20c.6-3.3 3.1-5 6.2-5s5.6 1.7 6.2 5"/><path d="M15.5 5.4a3.2 3.2 0 0 1 0 5.9M18.1 15.5c1.7.7 2.8 2 3.1 4.5"/></svg>,
+  doc: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M6 2.8h8l4 4V21a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V3.8a1 1 0 0 1 1-1Z"/><path d="M9 12h6M9 16h4"/></svg>,
+  trend: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="m3 16 5.5-5.5 4 4L21 6"/><path d="M15.5 6H21v5.5"/></svg>,
+  gear: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M19.3 14.9a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.2a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.2a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3h.1a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.2a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9v.1a1.7 1.7 0 0 0 1.5 1h.2a2 2 0 1 1 0 4h-.2a1.7 1.7 0 0 0-1.5 1Z"/></svg>,
+  user: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20.5c.8-3.8 3.9-5.7 7.5-5.7s6.7 1.9 7.5 5.7"/></svg>,
+  logout: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h8"/><path d="m17 8 4 4-4 4M21 12H9"/></svg>,
+};
 
+const MAIN_NAV = [
+  { id: 'Home', label: 'Home', icon: Ic.home },
+  { id: 'Appointments', label: 'Appointments', icon: Ic.calendar },
+  { id: 'Doctors', label: 'Doctors', icon: Ic.users },
+  { id: 'History', label: 'History', icon: Ic.doc },
+];
+
+const SECONDARY_NAV = [
+  { id: 'Health', label: 'Health Summary', icon: Ic.trend, tile: 'sb-tile--green' },
+  { id: 'Settings', label: 'Settings', icon: Ic.gear, tile: '' },
+  { id: 'Profile', label: 'Profile', icon: Ic.user, tile: '' },
+];
+
+export default function LeftSidebar({ activeTab, setActiveTab, onLogout }) {
   return (
     <aside className="left-sidebar">
-      <div className="brand-logo" style={{ marginBottom: '40px', display: 'flex', alignItems: 'center', gap: '12px', padding: '0 8px' }}>
-        <div style={{color:'#14b8a6', fontSize: '32px', fontWeight: 'bold'}}>🫀</div>
+      <div className="sb-logo">
+        <span className="sb-logo__icon" aria-hidden="true">🫀</span>
         <div>
-          <div className="brand-title" style={{color: 'white', fontSize: '20px', fontWeight: '700'}}>SwasthyaAI</div>
-          <div className="brand-subtitle" style={{color: '#9ca3af', fontSize: '10px', textTransform:'uppercase', letterSpacing:'1px', marginTop:'4px'}}>Healthcare Companion</div>
+          <div className="sb-logo__title">SwasthyaAI</div>
+          <div className="sb-logo__sub">Healthcare Companion</div>
         </div>
       </div>
 
-      <nav className="nav-links">
-        {tabs.map((tab) => (
-          <a
-            key={tab.id}
-            className={`nav-item ${activeTab === tab.id ? 'active' : ''}`}
-            onClick={() => setActiveTab(tab.id)}
+      <div className="sb-divider" />
+
+      <nav className="sb-nav" aria-label="Main">
+        {MAIN_NAV.map((item) => (
+          <button
+            key={item.id}
+            className={`sb-item ${activeTab === item.id ? 'active' : ''}`}
+            onClick={() => setActiveTab(item.id)}
+            aria-current={activeTab === item.id ? 'page' : undefined}
           >
-            {tab.label}
-          </a>
+            {item.icon}
+            <span>{item.label}</span>
+          </button>
         ))}
       </nav>
 
+      <div className="sb-divider" />
 
-      <div className="help-widget" style={{background: 'linear-gradient(135deg, #0f766e, #115e59)', borderRadius: '16px', padding: '20px', color: 'white', marginTop: 'auto', border: '1px solid #14b8a6', boxShadow: '0 4px 6px rgba(0,0,0,0.1)'}}>
-        <div className="help-title" style={{display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold', fontSize: '15px', marginBottom: '8px'}}>
-          Need Help?
-        </div>
-        <div className="help-desc" style={{fontSize: '12px', opacity: 0.9, marginBottom: '20px', lineHeight: 1.5}}>Talk to the assistant by voice or text.</div>
-        <button className="help-btn" onClick={() => setActiveTab('Home')} style={{background: 'rgba(20, 184, 166, 0.2)', border: '1px solid #14b8a6', borderRadius: '8px', padding: '10px 12px', width: '100%', color: 'white', fontSize: '13px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'}}>
-          🎧 Talk to Assistant
-        </button>
-      </div>
+      <nav className="sb-nav" aria-label="Account">
+        {SECONDARY_NAV.map((item) => (
+          <button
+            key={item.id}
+            className={`sb-item sb-item--tiled ${activeTab === item.id ? 'active' : ''}`}
+            onClick={() => setActiveTab(item.id)}
+            aria-current={activeTab === item.id ? 'page' : undefined}
+          >
+            <span className={`sb-tile ${item.tile}`}>{item.icon}</span>
+            <span>{item.label}</span>
+          </button>
+        ))}
+      </nav>
 
-      {/* Logout Button moved below Help Widget */}
-      <a className="nav-item logout-btn" onClick={onLogout} style={{ color: '#ef4444', marginTop: '16px', display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', cursor: 'pointer', borderRadius: '8px' }}>
-        Logout
-      </a>
+      <div style={{ flex: 1 }} />
+
+      <div className="sb-divider" />
+
+      <button className="sb-item sb-item--tiled sb-logout" onClick={onLogout}>
+        <span className="sb-tile sb-tile--red">{Ic.logout}</span>
+        <span>Logout</span>
+      </button>
     </aside>
   );
 }
