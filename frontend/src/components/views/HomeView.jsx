@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useChat } from '../../context/ChatContext';
 import { useVoiceSession } from '../../hooks/useVoiceSession';
 import ChatWindow from '../ChatWindow';
+import LanguagePills from '../ui/LanguagePills';
 import VoiceInterface from '../VoiceInterface';
 
 function TrustBanner() {
@@ -57,11 +58,11 @@ export default function HomeView({ dashboardData, setActiveTab }) {
 
         {/* Top Controls */}
         <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', alignItems: 'center' }}>
-          <select className="lang-select" value={language} onChange={e => setLanguage(e.target.value)} style={{ padding: '8px 12px', borderRadius: '20px', border: '1px solid #e5e7eb', background: 'white', fontSize: '13px', cursor: 'pointer', outline: 'none' }}>
-            <option value="en">🌐 English</option>
-            <option value="hi">🌐 Hindi</option>
-            <option value="ta">🌐 Tamil</option>
-          </select>
+          <LanguagePills
+            value={language}
+            onChange={(code) => { setLanguage(code); localStorage.setItem('preferredLang', code); }}
+            className="lang-pills--light"
+          />
           <div className="online-badge" style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#ecfdf5', color: '#065f46', padding: '8px 12px', borderRadius: '20px', fontSize: '13px', fontWeight: '500' }}>
             <div style={{ width: '8px', height: '8px', background: '#10b981', borderRadius: '50%' }}></div> Online
           </div>

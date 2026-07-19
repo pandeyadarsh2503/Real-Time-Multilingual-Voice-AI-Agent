@@ -196,6 +196,20 @@
 .lang-pills button[aria-pressed="true"] { color: var(--aqua-300); }
 .lang-pills button:hover { color: var(--text-hi); }
 
+/* light-surface variant — same control, readable on white */
+.lang-pills--light {
+  background: white;
+  border-color: #e5e7eb;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+.lang-pills--light .lang-pills__thumb {
+  background: rgba(6, 182, 212, 0.12);
+  border-color: rgba(6, 182, 212, 0.45);
+}
+.lang-pills--light button { color: #6b7280; }
+.lang-pills--light button[aria-pressed="true"] { color: #0891b2; }
+.lang-pills--light button:hover { color: #111827; }
+
 /* ── Empty state ── */
 .empty-state {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
