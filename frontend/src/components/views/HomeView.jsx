@@ -5,34 +5,13 @@ import ChatWindow from '../ChatWindow';
 import LanguagePills from '../ui/LanguagePills';
 import VoiceInterface from '../VoiceInterface';
 
-function TrustBanner() {
-  const items = [
-    { icon: '🛡️', bg: '#eff6ff', color: '#3b82f6', title: 'Secure & Private', desc: 'Authenticated & access-controlled' },
-    { icon: '🕒', bg: '#ecfdf5', color: '#10b981', title: '24/7 Available', desc: "We're here anytime" },
-    { icon: '🌐', bg: '#eff6ff', color: '#3b82f6', title: 'Multilingual', desc: 'English, Hindi & Tamil' },
-  ];
-  return (
-    <div className="trust-banner" style={{ background: 'white', borderRadius: '12px', padding: '16px', display: 'flex', justifyContent: 'space-between', border: '1px solid #e5e7eb', marginTop: '20px' }}>
-      {items.map((item) => (
-        <div key={item.title} className="trust-item" style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-          <div style={{ background: item.bg, color: item.color, width: '32px', height: '32px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{item.icon}</div>
-          <div>
-            <div style={{ fontSize: '0.85rem', fontWeight: '600', color: '#1f2937' }}>{item.title}</div>
-            <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>{item.desc}</div>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 export default function HomeView({ dashboardData, setActiveTab }) {
   const { patientName, messages, status, language, setLanguage, sendChatMessage } = useChat();
   const session = useVoiceSession();
   const isDisabled = status === 'thinking' || status === 'speaking';
 
   return (
-    <div className="home-dashboard" style={{ display: 'flex', height: '100%', width: '100%', gap: '32px', padding: '32px 48px', background: '#f9fafb' }}>
+    <div className="home-dashboard" style={{ display: 'flex', height: '100%', width: '100%', gap: '20px', padding: '20px 24px', background: '#f9fafb' }}>
 
       {/* Center Column: Chat & Assistant */}
       <div className="center-column" style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0 }}>
@@ -48,8 +27,6 @@ export default function HomeView({ dashboardData, setActiveTab }) {
             <VoiceInterface session={session} disabled={isDisabled} />
           </div>
         </div>
-
-        <TrustBanner />
       </div>
 
       {/* Right Column: Widgets */}
