@@ -3,7 +3,7 @@ import {
   signInWithEmailAndPassword,
   updateProfile,
 } from 'firebase/auth'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { auth } from '../firebase'
 import Button from './ui/Button'
 import DnaHelix from './ui/DnaHelix'
@@ -27,6 +27,16 @@ export default function Login() {
   const [errorKey, setErrorKey] = useState(0)   // re-triggers the shake
   const [loading, setLoading] = useState(false)
   const [lang, setLang] = useState(() => localStorage.getItem('preferredLang') || 'en')
+
+  // The engine scales with the viewport: ~85% of its height (helix is
+  // 1.5x taller than wide), capped so huge monitors stay composed.
+  const heroSize = () => Math.min(470, Math.round((window.innerHeight * 0.85) / 1.5))
+  const [coreSize, setCoreSize] = useState(heroSize)
+  useEffect(() => {
+    const onResize = () => setCoreSize(heroSize())
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
 
   const chooseLang = (code) => {
     setLang(code)
@@ -219,7 +229,12 @@ export default function Login() {
       <div className="auth-core" aria-hidden="false">
         <span className="auth-core__beam" aria-hidden="true" />
         <span className="auth-core__glow" aria-hidden="true" />
-        <DnaHelix state="idle" size={190} label="SwasthyaAI assistant, ready" />
+        <DnaHelix
+          state="idle"
+          size={coreSize}
+          interactive={false}
+          label="SwasthyaAI assistant, ready"
+        />
       </div>
     </div>
   )

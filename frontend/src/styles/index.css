@@ -287,6 +287,24 @@
 @keyframes dnaEcgFlow { to { stroke-dashoffset: -346; } }
 
 .dna__strand { fill: none; stroke-width: 1.2; stroke-linejoin: round; }
+.dna__strand--ghost { stroke-width: 5; }
+
+/* inner glow that breathes with the helix — layered under the SVG */
+.dna__coreGlow {
+  position: absolute; inset: 8% 2%;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at 50% 48%,
+    rgba(34, 211, 238, 0.16) 0%,
+    rgba(34, 211, 238, 0.05) 45%,
+    transparent 72%);
+  filter: blur(10px);
+  animation: dnaGlowBreathe 5.2s var(--ease-breathe) infinite;
+  pointer-events: none;
+}
+@keyframes dnaGlowBreathe {
+  0%, 100% { transform: scale(1);    opacity: 0.75; }
+  50%      { transform: scale(1.07); opacity: 1; }
+}
 .dna__wave { width: 86%; margin-top: 2px; }
 
 /* ── Live waveform canvas ── */
@@ -1040,20 +1058,19 @@ html, body {
   place-items: center;
   pointer-events: none;           /* never block the form */
 }
-.auth-core .dna { pointer-events: auto; }
 .auth-core__glow {
   position: absolute;
-  width: 540px; height: 540px; border-radius: 50%;
+  width: 145%; aspect-ratio: 1; border-radius: 50%;
   background: radial-gradient(circle,
-    rgba(34, 211, 238, 0.14) 0%,
-    rgba(34, 211, 238, 0.05) 42%,
+    rgba(34, 211, 238, 0.13) 0%,
+    rgba(34, 211, 238, 0.045) 42%,
     transparent 70%);
 }
 .auth-core__beam {
   position: absolute;
-  width: 820px; height: 150px;
+  width: 230%; height: 26%;
   background: radial-gradient(ellipse at center,
-    rgba(34, 211, 238, 0.10) 0%,
+    rgba(34, 211, 238, 0.09) 0%,
     rgba(34, 211, 238, 0.03) 45%,
     transparent 72%);
 }

@@ -53,10 +53,20 @@ const mix = (a, b, t) => [
 ]
 const rgba = (c, a) => `rgba(${c[0]},${c[1]},${c[2]},${a})`
 
-// particle field: 8 strand-travellers (+ their strand & speed factor)
-const TRAVELLERS = Array.from({ length: 8 }, (_, i) => ({
+// particle field: 12 strand-travellers (+ their strand & speed factor)
+const TRAVELLERS = Array.from({ length: 12 }, (_, i) => ({
   strand: i % 2, u: (i * 0.137) % 1, rate: 0.6 + (i % 4) * 0.2,
 }))
+
+// light signals: bright pulses racing the strands with fading tails —
+// the energy running through the engine
+const SIGNALS = [
+  { strand: 0, u: 0.0,  speed: 0.15 },
+  { strand: 0, u: 0.55, speed: 0.12 },
+  { strand: 1, u: 0.3,  speed: 0.17 },
+  { strand: 1, u: 0.8,  speed: 0.13 },
+]
+const TRAIL = [0, -0.045, -0.09]
 
 export default function DnaHelix({
   state = 'idle',
@@ -65,6 +75,9 @@ export default function DnaHelix({
   label,
   withWaveform = false,
   onActivate,
+  /** false: never intercepts the pointer (hero/backdrop placements);
+      parallax then follows the cursor across the whole window. */
+  interactive = true,
 }) {
   const wrapRef = useRef(null)
   const tiltRef = useRef(null)
@@ -73,6 +86,9 @@ export default function DnaHelix({
   const rungs = useRef([])
   const strandA = useRef(null)
   const strandB = useRef(null)
+  const strandAGhost = useRef(null)
+  const strandBGhost = useRef(null)
+  const signalRefs = useRef([])
   const travellers = useRef([])
   const orbiters = useRef([])
   const burst = useRef([])
@@ -110,17 +126,24 @@ export default function DnaHelix({
     }
 
     const onMove = (e) => {
-      const r = wrapRef.current?.getBoundingClientRect()
-      if (!r) return
-      mouse.x = ((e.clientX - r.left) / r.width - 0.5) * 2
-      mouse.y = ((e.clientY - r.top) / r.height - 0.5) * 2
+      if (interactive) {
+        const r = wrapRef.current?.getBoundingClientRect()
+        if (!r) return
+        mouse.x = ((e.clientX - r.left) / r.width - 0.5) * 2
+        mouse.y = ((e.clientY - r.top) / r.height - 0.5) * 2
+      } else {
+        mouse.x = (e.clientX / window.innerWidth - 0.5) * 2
+        mouse.y = (e.clientY / window.innerHeight - 0.5) * 2
+      }
     }
     const onLeave = () => { mouse.x = 0; mouse.y = 0 }
     const el = wrapRef.current
-    if (!reduced && el) {
-      el.addEventListener('mousemove', onMove)
-      el.addEventListener('mouseleave', onLeave)
+    const pointerSource = interactive ? el : window
+    if (!reduced && pointerSource) {
+      pointerSource.addEventListener('mousemove', onMove)
+      pointerSource.addEventListener('mouseleave', onLeave)
     }
+    const signals = SIGNALS.map((s) => ({ ...s }))
 
     const frame = (now) => {
       const dt = Math.min(0.05, (now - last) / 1000)
@@ -211,10 +234,17 @@ export default function DnaHelix({
         }
       }
       const d = (pts) => pts.map((p, i) => `${i ? 'L' : 'M'}${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ')
-      strandA.current?.setAttribute('d', d(ptsA))
+      const dA = d(ptsA)
+      const dB = d(ptsB)
+      strandA.current?.setAttribute('d', dA)
       strandA.current?.setAttribute('stroke', rgba(base, 0.35 * glow + 0.1))
-      strandB.current?.setAttribute('d', d(ptsB))
+      strandB.current?.setAttribute('d', dB)
       strandB.current?.setAttribute('stroke', rgba(mix(base, AQUA, 0.5), 0.3 * glow + 0.08))
+      // ghost underlay: wider, dimmer copies read as out-of-focus depth
+      strandAGhost.current?.setAttribute('d', dA)
+      strandAGhost.current?.setAttribute('stroke', rgba(base, 0.09 * glow + 0.03))
+      strandBGhost.current?.setAttribute('d', dB)
+      strandBGhost.current?.setAttribute('stroke', rgba(mix(base, AQUA, 0.5), 0.08 * glow + 0.03))
 
       // ── strand travellers ──
       travel.forEach((tr, i) => {
@@ -233,6 +263,25 @@ export default function DnaHelix({
         ref.setAttribute('cx', p.x.toFixed(2))
         ref.setAttribute('cy', p.y.toFixed(2))
         ref.setAttribute('fill', rgba(mix(base, WHITE, 0.55), (0.25 + depth * 0.55) * glow))
+      })
+
+      // ── light signals racing the strands ──
+      signals.forEach((sig, i) => {
+        if (!reduced) {
+          const boost = st === 'thinking' ? 2.4 : st === 'speaking' ? 2.0 : st === 'listening' ? 1.4 : 1
+          sig.u = (sig.u + dt * sig.speed * boost) % 1
+        }
+        TRAIL.forEach((off, k) => {
+          const ref = signalRefs.current[i * TRAIL.length + k]
+          if (!ref) return
+          const u = ((sig.u + off) % 1 + 1) % 1
+          const p = nodePos(sig.strand, u * (N - 1), phase)
+          const depth = (p.z + 1) / 2
+          ref.setAttribute('cx', p.x.toFixed(2))
+          ref.setAttribute('cy', p.y.toFixed(2))
+          ref.setAttribute('r', (2.5 - k * 0.7).toFixed(2))
+          ref.setAttribute('fill', rgba(mix(base, WHITE, 0.85), (0.85 - k * 0.3) * (0.3 + depth * 0.7) * glow))
+        })
       })
 
       // ── thinking orbiters ──
@@ -260,12 +309,14 @@ export default function DnaHelix({
         }
       })
 
-      // ── parallax tilt (smoothed) ──
+      // ── perspective: gentle autonomous sway + cursor parallax ──
       if (tiltRef.current && !reduced) {
         tilt.x += (mouse.x - tilt.x) * 0.06
         tilt.y += (mouse.y - tilt.y) * 0.06
+        const swayY = Math.sin(t * 0.26) * 4.5
+        const swayX = Math.cos(t * 0.21) * 2.5
         tiltRef.current.style.transform =
-          `perspective(700px) rotateY(${(tilt.x * 7).toFixed(2)}deg) rotateX(${(-tilt.y * 6).toFixed(2)}deg)`
+          `perspective(700px) rotateY(${(tilt.x * 7 + swayY).toFixed(2)}deg) rotateX(${(-tilt.y * 6 + swayX).toFixed(2)}deg)`
       }
 
       if (!reduced) raf = requestAnimationFrame(frame)
@@ -279,12 +330,12 @@ export default function DnaHelix({
     return () => {
       cancelAnimationFrame(raf)
       if (staticIv) clearInterval(staticIv)
-      if (el) {
-        el.removeEventListener('mousemove', onMove)
-        el.removeEventListener('mouseleave', onLeave)
+      if (pointerSource) {
+        pointerSource.removeEventListener('mousemove', onMove)
+        pointerSource.removeEventListener('mouseleave', onLeave)
       }
     }
-  }, [getLevel])
+  }, [getLevel, interactive])
 
   const height = size * (VIEW_H / VIEW_W)
 
@@ -293,7 +344,7 @@ export default function DnaHelix({
       ref={wrapRef}
       className="dna"
       data-state={state}
-      style={{ width: size }}
+      style={{ width: size, pointerEvents: interactive ? undefined : 'none' }}
       role="img"
       aria-label={label || `Assistant is ${state}`}
       onClick={() => {
@@ -305,6 +356,7 @@ export default function DnaHelix({
     >
       <div className="dna__floater">
         <div ref={tiltRef} className="dna__tilt">
+          <span className="dna__coreGlow" aria-hidden="true" />
           {/* sonar rings — CSS-driven by data-state */}
           <span className="dna__ring" />
           <span className="dna__ring" />
@@ -331,7 +383,9 @@ export default function DnaHelix({
               aria-hidden="true"
             />
 
-            {/* strands */}
+            {/* strands (ghost underlay first = depth blur) */}
+            <path ref={strandAGhost} className="dna__strand dna__strand--ghost" />
+            <path ref={strandBGhost} className="dna__strand dna__strand--ghost" />
             <path ref={strandA} className="dna__strand" />
             <path ref={strandB} className="dna__strand" />
 
@@ -352,6 +406,11 @@ export default function DnaHelix({
             {TRAVELLERS.map((_, i) => (
               <circle key={`t${i}`} ref={(e) => (travellers.current[i] = e)} r="1.7" />
             ))}
+
+            {/* light signals with fading tails */}
+            {SIGNALS.flatMap((_, i) => TRAIL.map((_2, k) => (
+              <circle key={"sig" + i + "-" + k} ref={(e) => (signalRefs.current[i * TRAIL.length + k] = e)} />
+            )))}
 
             {/* thinking orbiters */}
             {Array.from({ length: 3 }).map((_, i) => (
