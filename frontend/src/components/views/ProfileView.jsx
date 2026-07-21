@@ -2,6 +2,8 @@ import { updateProfile } from 'firebase/auth';
 import React, { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { auth } from '../../firebase';
+import { useChat } from '../../context/ChatContext';
+import { t } from '../../i18n';
 import { appointmentsAPI } from '../../services/api';
 
 const countries = [
@@ -14,6 +16,7 @@ const countries = [
 ];
 
 export default function ProfileView({ user }) {
+  const { language } = useChat();
   const [isEditing, setIsEditing] = useState(false);
   const [displayName, setDisplayName] = useState(user?.displayName || '');
   const [countryCode, setCountryCode] = useState(localStorage.getItem('patientCountryCode') || '+91');
@@ -64,8 +67,8 @@ export default function ProfileView({ user }) {
     <div className="view-container fade-in">
       <header className="top-header" style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: '20px' }}>
         <div className="header-titles">
-          <h1>Patient Profile</h1>
-          <p>Your account and booking activity</p>
+          <h1>{t(language, 'view.profile.title')}</h1>
+          <p>{t(language, 'view.profile.sub')}</p>
         </div>
       </header>
 

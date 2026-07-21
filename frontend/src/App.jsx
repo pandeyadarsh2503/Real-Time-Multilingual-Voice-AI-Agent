@@ -80,10 +80,10 @@ function AuthedApp({ user, userPhone }) {
     upcomingAppointment: null,
     recentDoctors: [],
     quickActions: [
-      { id: 'book', icon: '📅', title: 'Book Appointment', bgColor: '#f0f9ff', iconColor: '#3b82f6', prompt: 'Book an appointment' },
-      { id: 'check', icon: '🗓️', title: 'Check Availability', bgColor: '#f0fdf4', iconColor: '#10b981', prompt: 'Check availability' },
-      { id: 'reschedule', icon: '🔄', title: 'Reschedule Appointment', bgColor: '#fff7ed', iconColor: '#f59e0b', prompt: 'Reschedule my appointment' },
-      { id: 'cancel', icon: '❌', title: 'Cancel Appointment', bgColor: '#fef2f2', iconColor: '#ef4444', prompt: 'Cancel appointment' },
+      { id: 'book', icon: '📅', titleKey: 'qa.book', bgColor: '#f0f9ff', iconColor: '#3b82f6', promptKey: 'qa.book.prompt' },
+      { id: 'check', icon: '🗓️', titleKey: 'qa.check', bgColor: '#f0fdf4', iconColor: '#10b981', promptKey: 'qa.check.prompt' },
+      { id: 'reschedule', icon: '🔄', titleKey: 'qa.reschedule', bgColor: '#fff7ed', iconColor: '#f59e0b', promptKey: 'qa.reschedule.prompt' },
+      { id: 'cancel', icon: '❌', titleKey: 'qa.cancel', bgColor: '#fef2f2', iconColor: '#ef4444', promptKey: 'qa.cancel.prompt' },
     ],
   })
 

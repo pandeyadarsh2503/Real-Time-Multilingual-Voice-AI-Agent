@@ -116,7 +116,7 @@ async def run_chat_turn(
 
     tool_executor = build_tool_executor(db, user, patient_name, lang, on_tool=on_tool)
     current_messages = await get_session(session_key, db)
-    response_text, updated = await run_agent(current_messages, tool_executor)
+    response_text, updated = await run_agent(current_messages, tool_executor, reply_language=lang)
 
     updated = await compress_session_messages(updated, summarize_conversation)
     await replace_session(session_key, updated)

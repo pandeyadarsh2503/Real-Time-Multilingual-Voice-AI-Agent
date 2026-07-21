@@ -1,8 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
+import { useChat } from '../../context/ChatContext';
+import { t } from '../../i18n';
 import { appointmentsAPI } from '../../services/api';
 
 export default function HistoryView() {
+  const { language } = useChat();
   const [appointments, setAppointments] = useState([]);
 
   useEffect(() => {
@@ -29,8 +32,8 @@ export default function HistoryView() {
     <div className="view-container fade-in">
       <header className="top-header" style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: '20px' }}>
         <div className="header-titles">
-          <h1>Appointment History</h1>
-          <p>Your bookings and cancellations</p>
+          <h1>{t(language, 'view.history.title')}</h1>
+          <p>{t(language, 'view.history.sub')}</p>
         </div>
       </header>
 

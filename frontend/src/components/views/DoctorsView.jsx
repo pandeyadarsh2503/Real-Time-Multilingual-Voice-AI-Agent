@@ -1,8 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
+import { useChat } from '../../context/ChatContext';
+import { t } from '../../i18n';
 import { doctorsAPI } from '../../services/api';
 
 export default function DoctorsView({ onBook }) {
+  const { language } = useChat();
   const [doctors, setDoctors] = useState([]);
   const [search, setSearch] = useState('');
 
@@ -27,8 +30,8 @@ export default function DoctorsView({ onBook }) {
     <div className="view-container fade-in">
       <header className="top-header" style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: '20px' }}>
         <div className="header-titles">
-          <h1>Doctor Directory</h1>
-          <p>Find and book with specialized doctors</p>
+          <h1>{t(language, 'view.doctors.title')}</h1>
+          <p>{t(language, 'view.doctors.sub')}</p>
         </div>
         <div className="search-bar">
           <input

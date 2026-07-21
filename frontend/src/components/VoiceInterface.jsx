@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react'
 import { useChat } from '../context/ChatContext'
+import { t } from '../i18n'
 
 /**
  * VoiceInterface — the input dock: Live toggle, push-to-talk mic, text
@@ -7,7 +8,7 @@ import { useChat } from '../context/ChatContext'
  * tool activity). Voice logic lives in useVoiceSession, owned by HomeView.
  */
 export default function VoiceInterface({ session, disabled }) {
-  const { sendChatMessage } = useChat()
+  const { sendChatMessage, language } = useChat()
   const [textValue, setTextValue] = useState('')
   const { live, connecting, isRecording, toggleLive, handleMic } = session
 
@@ -49,7 +50,7 @@ export default function VoiceInterface({ session, disabled }) {
         {/* Text input */}
         <input
           className="input-field"
-          placeholder={live ? 'Live conversation in progress…' : 'Type your message...'}
+          placeholder={live ? t(language, 'chat.liveInProgress') : t(language, 'chat.placeholder')}
           value={textValue}
           onChange={(e) => setTextValue(e.target.value)}
           onKeyDown={onKeyDown}
@@ -69,7 +70,7 @@ export default function VoiceInterface({ session, disabled }) {
       {/* One honest status line: live partial transcript, the agent's
           real tool activity, or a gentle default */}
       <div className="input-hint" aria-live="polite">
-        {session.statusLine || 'Go Live for a hands-free conversation, or use the mic / type 🛈'}
+        {session.statusLine || t(language, 'chat.hint')}
       </div>
     </div>
   )

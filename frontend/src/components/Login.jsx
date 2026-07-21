@@ -7,6 +7,7 @@ import {
 } from 'firebase/auth'
 import { useEffect, useState } from 'react'
 import { auth } from '../firebase'
+import { t } from '../i18n'
 import Button from './ui/Button'
 import DnaHelix from './ui/DnaHelix'
 import LanguagePills from './ui/LanguagePills'
@@ -135,50 +136,47 @@ export default function Login() {
           </div>
 
           <div className="auth-badge">
-            <span className="hl">Your AI. Your Health.</span>&nbsp;Always with you.
+            <span className="hl">{t(lang, 'login.badge.hl')}</span>{t(lang, 'login.badge.rest')}
           </div>
 
-          <h1 className="auth-hero-title">Talk to your <span className="hl">healthcare</span> companion</h1>
-          <p className="auth-hero-subtitle">
-            Book appointments, check availability and get voice reminders —
-            in English, Hindi or Tamil. Just speak.
-          </p>
+          <h1 className="auth-hero-title">{t(lang, 'login.title.pre')}<span className="hl">{t(lang, 'login.title.accent')}</span>{t(lang, 'login.title.post')}</h1>
+          <p className="auth-hero-subtitle">{t(lang, 'login.subtitle')}</p>
 
           <div className="auth-features">
             <div className="auth-feature-item">
               <span className="auth-feature-icon">🎤</span>
               <div>
-                <h4>Live voice conversations</h4>
-                <p>Natural real-time speech with interruptions, just like talking.</p>
+                <h4>{t(lang, 'login.f1.title')}</h4>
+                <p>{t(lang, 'login.f1.desc')}</p>
               </div>
             </div>
             <div className="auth-feature-item">
               <span className="auth-feature-icon">📅</span>
               <div>
-                <h4>Smart scheduling</h4>
-                <p>Conflict-free bookings within each doctor's real hours.</p>
+                <h4>{t(lang, 'login.f2.title')}</h4>
+                <p>{t(lang, 'login.f2.desc')}</p>
               </div>
             </div>
             <div className="auth-feature-item">
               <span className="auth-feature-icon">🔔</span>
               <div>
-                <h4>Reminder calls</h4>
-                <p>AI assistant calls you beforehand so you never miss.</p>
+                <h4>{t(lang, 'login.f3.title')}</h4>
+                <p>{t(lang, 'login.f3.desc')}</p>
               </div>
             </div>
             <div className="auth-feature-item">
               <span className="auth-feature-icon">🌐</span>
               <div>
-                <h4>Multilingual</h4>
-                <p>English, हिन्दी, தமிழ் and more coming soon.</p>
+                <h4>{t(lang, 'login.f4.title')}</h4>
+                <p>{t(lang, 'login.f4.desc')}</p>
               </div>
             </div>
           </div>
 
           <div className="auth-trust">
-            <span>🛡️ Secure &amp; Private</span>
-            <span>✦ AI Powered</span>
-            <span>❤️ Built for Better Health</span>
+            <span>{t(lang, 'login.trust1')}</span>
+            <span>{t(lang, 'login.trust2')}</span>
+            <span>{t(lang, 'login.trust3')}</span>
           </div>
         </div>
       </div>
@@ -191,8 +189,8 @@ export default function Login() {
           </div>
 
           <div className="auth-form-header">
-            <h2>{isRegister ? 'Create an account' : 'Welcome back'}</h2>
-            <p>{isRegister ? 'Sign up to meet your assistant.' : 'Sign in to continue the conversation.'}</p>
+            <h2>{isRegister ? t(lang, 'login.create') : t(lang, 'login.welcome')}</h2>
+            <p>{isRegister ? t(lang, 'login.createSub') : t(lang, 'login.welcomeSub')}</p>
           </div>
 
           {error && (
@@ -206,7 +204,7 @@ export default function Login() {
             {isRegister && (
               <div className="auth-input-group-row">
                 <div className="auth-input-group">
-                  <label htmlFor="auth-name">Full Name</label>
+                  <label htmlFor="auth-name">{t(lang, 'login.fullName')}</label>
                   <input
                     id="auth-name"
                     type="text"
@@ -219,7 +217,7 @@ export default function Login() {
                   />
                 </div>
                 <div className="auth-input-group">
-                  <label htmlFor="auth-phone">Phone <span>(for reminders)</span></label>
+                  <label htmlFor="auth-phone">{t(lang, 'login.phone')} <span>{t(lang, 'login.phoneNote')}</span></label>
                   <input
                     id="auth-phone"
                     type="tel"
@@ -235,7 +233,7 @@ export default function Login() {
             )}
 
             <div className="auth-input-group">
-              <label htmlFor="auth-email">Email Address</label>
+              <label htmlFor="auth-email">{t(lang, 'login.email')}</label>
               <div className="auth-input-wrap">
                 <span className="auth-input-icon">{I.mail}</span>
                 <input
@@ -252,7 +250,7 @@ export default function Login() {
             </div>
 
             <div className="auth-input-group">
-              <label htmlFor="auth-password">Password</label>
+              <label htmlFor="auth-password">{t(lang, 'login.password')}</label>
               <div className="auth-input-wrap">
                 <span className="auth-input-icon">{I.lock}</span>
                 <input
@@ -277,24 +275,24 @@ export default function Login() {
             </div>
 
             <Button type="submit" variant="primary" size="lg" loading={loading} style={{ width: '100%', marginTop: 4 }}>
-              {isRegister ? 'Sign Up' : 'Sign In'} <span className="btn-arrow" aria-hidden="true">→</span>
+              {isRegister ? t(lang, 'login.signUp') : t(lang, 'login.signIn')} <span className="btn-arrow" aria-hidden="true">→</span>
             </Button>
           </form>
 
-          <div className="auth-divider">or continue with</div>
+          <div className="auth-divider">{t(lang, 'login.orContinue')}</div>
 
           <Button variant="glass" size="md" onClick={handleGoogle} disabled={loading} style={{ width: '100%' }}>
-            {I.google}&nbsp; Sign in with Google
+            {I.google}&nbsp; {t(lang, 'login.google')}
           </Button>
 
           <p className="auth-toggle-text">
-            {isRegister ? 'Already have an account? ' : "Don't have an account? "}
+            {isRegister ? t(lang, 'login.haveAccount') : t(lang, 'login.noAccount')}
             <button
               type="button"
               className="auth-toggle-btn"
               onClick={() => { setIsRegister(!isRegister); setError('') }}
             >
-              {isRegister ? 'Sign In' : 'Create one'}
+              {isRegister ? t(lang, 'login.signIn') : t(lang, 'login.createOne')}
             </button>
           </p>
         </div>

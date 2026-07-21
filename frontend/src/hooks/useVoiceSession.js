@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import toast from 'react-hot-toast'
 import { useChat } from '../context/ChatContext'
+import { STRINGS, t } from '../i18n'
 import { voiceAPI } from '../services/api'
 import { useLiveVoice } from './useLiveVoice'
 import { usePushToTalk } from './usePushToTalk'
@@ -12,14 +13,6 @@ import { usePushToTalk } from './usePushToTalk'
  * intelligent status lines driven by the agent's ACTUAL tool calls
  * (streamed over the DataChannel) — never a fake spinner narrative.
  */
-
-const TOOL_LABELS = {
-  check_availability: 'Checking doctor availability…',
-  book_appointment: 'Booking your appointment…',
-  list_my_appointments: 'Finding your appointments…',
-  reschedule_appointment: 'Rescheduling your appointment…',
-  cancel_appointment: 'Cancelling your appointment…',
-}
 
 export function useVoiceSession() {
   const {
@@ -33,10 +26,11 @@ export function useVoiceSession() {
   const toolTimer = useRef(null)
 
   const onTool = useCallback((name) => {
-    setToolLabel(TOOL_LABELS[name] || 'Working on it…')
+    const key = `tool.${name}`
+    setToolLabel(t(language, STRINGS.en[key] ? key : 'tool.generic'))
     clearTimeout(toolTimer.current)
     toolTimer.current = setTimeout(() => setToolLabel(''), 6000)
-  }, [])
+  }, [language])
 
   const liveVoice = useLiveVoice({
     onPartial: setPartial,
@@ -85,10 +79,10 @@ export function useVoiceSession() {
   // ── status line under the helix ──
   const statusLine = partial
     ? `“${partial}…”`
-    : status === 'listening' ? "I'm listening…"
-    : status === 'thinking' ? (toolLabel || 'Understanding your request…')
-    : status === 'speaking' ? 'Speaking…'
-    : liveVoice.live ? 'Live — just speak naturally'
+    : status === 'listening' ? t(language, 'status.listening')
+    : status === 'thinking' ? (toolLabel || t(language, 'status.thinking'))
+    : status === 'speaking' ? t(language, 'status.speaking')
+    : liveVoice.live ? t(language, 'status.live')
     : ''
 
   // ── push-to-talk flow ──

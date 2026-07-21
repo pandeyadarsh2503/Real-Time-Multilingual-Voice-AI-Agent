@@ -1,4 +1,6 @@
 import React from 'react';
+import { useChat } from '../context/ChatContext';
+import { t } from '../i18n';
 
 // line icons, stroke = currentColor
 const Ic = {
@@ -13,26 +15,27 @@ const Ic = {
 };
 
 const MAIN_NAV = [
-  { id: 'Home', label: 'Home', icon: Ic.home },
-  { id: 'Appointments', label: 'Appointments', icon: Ic.calendar },
-  { id: 'Doctors', label: 'Doctors', icon: Ic.users },
-  { id: 'History', label: 'History', icon: Ic.doc },
+  { id: 'Home', labelKey: 'nav.home', icon: Ic.home },
+  { id: 'Appointments', labelKey: 'nav.appointments', icon: Ic.calendar },
+  { id: 'Doctors', labelKey: 'nav.doctors', icon: Ic.users },
+  { id: 'History', labelKey: 'nav.history', icon: Ic.doc },
 ];
 
 const SECONDARY_NAV = [
-  { id: 'Health', label: 'Health Summary', icon: Ic.trend, tile: 'sb-tile--green' },
-  { id: 'Settings', label: 'Settings', icon: Ic.gear, tile: '' },
-  { id: 'Profile', label: 'Profile', icon: Ic.user, tile: '' },
+  { id: 'Health', labelKey: 'nav.health', icon: Ic.trend, tile: 'sb-tile--green' },
+  { id: 'Settings', labelKey: 'nav.settings', icon: Ic.gear, tile: '' },
+  { id: 'Profile', labelKey: 'nav.profile', icon: Ic.user, tile: '' },
 ];
 
 export default function LeftSidebar({ activeTab, setActiveTab, onLogout }) {
+  const { language } = useChat();
   return (
     <aside className="left-sidebar">
       <div className="sb-logo">
         <span className="sb-logo__icon" aria-hidden="true">🫀</span>
         <div>
           <div className="sb-logo__title">SwasthyaAI</div>
-          <div className="sb-logo__sub">Healthcare Companion</div>
+          <div className="sb-logo__sub">{t(language, 'brand.sub')}</div>
         </div>
       </div>
 
@@ -47,7 +50,7 @@ export default function LeftSidebar({ activeTab, setActiveTab, onLogout }) {
             aria-current={activeTab === item.id ? 'page' : undefined}
           >
             {item.icon}
-            <span>{item.label}</span>
+            <span>{t(language, item.labelKey)}</span>
           </button>
         ))}
       </nav>
@@ -63,7 +66,7 @@ export default function LeftSidebar({ activeTab, setActiveTab, onLogout }) {
             aria-current={activeTab === item.id ? 'page' : undefined}
           >
             <span className={`sb-tile ${item.tile}`}>{item.icon}</span>
-            <span>{item.label}</span>
+            <span>{t(language, item.labelKey)}</span>
           </button>
         ))}
       </nav>
@@ -74,7 +77,7 @@ export default function LeftSidebar({ activeTab, setActiveTab, onLogout }) {
 
       <button className="sb-item sb-item--tiled sb-logout" onClick={onLogout}>
         <span className="sb-tile sb-tile--red">{Ic.logout}</span>
-        <span>Logout</span>
+        <span>{t(language, 'nav.logout')}</span>
       </button>
     </aside>
   );

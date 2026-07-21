@@ -1,8 +1,11 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
+import { useChat } from '../../context/ChatContext';
+import { t } from '../../i18n';
 import { appointmentsAPI, doctorsAPI, outboundAPI } from '../../services/api';
 
 export default function AppointmentsView({ patientName, onNewBooking, onReschedule, userPhone }) {
+  const { language } = useChat();
   const [selectedAppt, setSelectedAppt] = useState(null);
   const [appointments, setAppointments] = useState([]);
   const [reminders, setReminders] = useState([]);
@@ -103,8 +106,8 @@ export default function AppointmentsView({ patientName, onNewBooking, onReschedu
     <div className="view-container fade-in">
       <header className="top-header" style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: '20px' }}>
         <div className="header-titles">
-          <h1>Calendar & Reminders</h1>
-          <p>Manage your schedule and automated voice reminders</p>
+          <h1>{t(language, 'view.appts.title')}</h1>
+          <p>{t(language, 'view.appts.sub')}</p>
         </div>
         <div className="header-actions" style={{ display: 'flex', gap: '10px' }}>
           <button className="primary-btn" onClick={onNewBooking} style={{ background: '#3b82f6', color: 'white', padding: '8px 16px', borderRadius: '8px', border: 'none', cursor: 'pointer' }}>+ New Booking</button>

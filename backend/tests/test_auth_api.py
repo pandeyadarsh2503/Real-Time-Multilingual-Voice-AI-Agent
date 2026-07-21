@@ -144,7 +144,7 @@ def test_authorized_chat_success_path_with_rate_limit_headers(client, monkeypatc
     """
     import services.agent_runtime as agent_runtime
 
-    async def fake_agent(messages, tool_executor, max_iter=6):
+    async def fake_agent(messages, tool_executor, max_iter=6, reply_language=None):
         return "Hello! How can I help?", messages + [
             {"role": "assistant", "content": "Hello! How can I help?"}
         ]

@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
+import { useChat } from '../../context/ChatContext';
+import { t } from '../../i18n';
 import { appointmentsAPI } from '../../services/api';
 
 /**
@@ -7,6 +9,7 @@ import { appointmentsAPI } from '../../services/api';
  * appointment history. No invented vitals, no fake analytics.
  */
 export default function HealthSummaryView({ onTalk }) {
+  const { language } = useChat();
   const [appointments, setAppointments] = useState(null);
   const [upcoming, setUpcoming] = useState([]);
 
@@ -47,8 +50,8 @@ export default function HealthSummaryView({ onTalk }) {
     <div className="view-container fade-in">
       <header className="top-header" style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: '20px' }}>
         <div className="header-titles">
-          <h1>Health Summary</h1>
-          <p>Your care activity at a glance — computed from your real bookings</p>
+          <h1>{t(language, 'view.health.title')}</h1>
+          <p>{t(language, 'view.health.sub')}</p>
         </div>
       </header>
 

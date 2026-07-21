@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useChat } from '../../context/ChatContext';
+import { t } from '../../i18n';
 import api from '../../services/api';
 
 /**
@@ -44,8 +45,8 @@ export default function SettingsView() {
     <div className="view-container fade-in">
       <header className="top-header" style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: '20px' }}>
         <div className="header-titles">
-          <h1>System Status</h1>
-          <p>Live backend health and session information</p>
+          <h1>{t(language, 'view.settings.title')}</h1>
+          <p>{t(language, 'view.settings.sub')}</p>
         </div>
         <button
           onClick={runChecks}

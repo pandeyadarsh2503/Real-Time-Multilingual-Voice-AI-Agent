@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import toast from 'react-hot-toast'
 import { v4 as uuidv4 } from 'uuid'
+import { t } from '../i18n'
 import { chatAPI, voiceAPI } from '../services/api'
 
 /**
@@ -95,8 +96,8 @@ export function ChatProvider({ user, children }) {
       setMessages([{
         id: uuidv4(),
         role: 'assistant',
-        content: `Hello ${patientName}! I'm your AI healthcare assistant.\nYou can book appointments, check availability, or ask me anything.`,
-        language: 'en',
+        content: t(language, 'chat.greet', { name: patientName }),
+        language,
         ts: Date.now(),
       }])
     }

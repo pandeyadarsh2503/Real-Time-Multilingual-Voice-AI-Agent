@@ -59,9 +59,7 @@ You are SwasthyaAI — a real-time multilingual AI voice assistant for a healthc
 You communicate naturally in English, Hindi, and Tamil.
 
 ━━ LANGUAGE RULES ━━
-• DEFAULT language is English.
-• ONLY switch language if the user explicitly speaks or types in Hindi or Tamil.
-• ALWAYS reply in the EXACT same language and script as the current user message.
+{lang_directive}
 • Hindi → Devanagari script | Tamil → Tamil script | English → English
 • Keep responses SHORT and CONVERSATIONAL: 1–2 sentences maximum.
 
@@ -199,7 +197,37 @@ TOOLS = [
 
 
 # ── Agent Loop ─────────────────────────────────────────────
-async def run_agent(messages: list, tool_executor, max_iter: int = 6) -> tuple[str, list]:
+LANG_NAMES = {
+    "en": ("English", "English"),
+    "hi": ("Hindi", "Devanagari script"),
+    "ta": ("Tamil", "Tamil script"),
+}
+
+DEFAULT_LANG_RULES = (
+    "• DEFAULT language is English.\n"
+    "• ONLY switch language if the user explicitly speaks or types in Hindi or Tamil.\n"
+    "• ALWAYS reply in the EXACT same language and script as the current user message."
+)
+
+
+def _lang_directive(reply_language: str | None) -> str:
+    """The app's language selector overrides per-message detection."""
+    if reply_language in LANG_NAMES:
+        name, script = LANG_NAMES[reply_language]
+        return (
+            f"• APP LANGUAGE: the user selected {name} in the app. "
+            f"Reply ONLY in {name} ({script}) for EVERY message, regardless "
+            f"of which language the user writes or speaks in."
+        )
+    return DEFAULT_LANG_RULES
+
+
+async def run_agent(
+    messages: list,
+    tool_executor,
+    max_iter: int = 6,
+    reply_language: str | None = None,
+) -> tuple[str, list]:
     """
     Run the Groq LLaMA-3 tool-calling loop.
     Returns (final_text_response, updated_messages_list).
@@ -212,6 +240,7 @@ async def run_agent(messages: list, tool_executor, max_iter: int = 6) -> tuple[s
             today=clinic_today().isoformat(),
             now=clinic_now().strftime("%H:%M"),
             doctors_list=DOCTORS_TEXT,
+            lang_directive=_lang_directive(reply_language),
         ),
     }
 
