@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { useChat } from '../../context/ChatContext';
-import { t } from '../../i18n';
+import { LOCALES, t } from '../../i18n';
 import { appointmentsAPI, doctorsAPI, outboundAPI } from '../../services/api';
 
 export default function AppointmentsView({ patientName, onNewBooking, onReschedule, userPhone }) {
@@ -33,7 +33,7 @@ export default function AppointmentsView({ patientName, onNewBooking, onReschedu
       setDoctorsList(docsRes.data);
     } catch (err) {
       console.error('Failed to load appointments/reminders', err);
-      toast.error('Could not load your appointments.');
+      toast.error(t(language, 'toast.loadAppointments'));
     }
   }, []);
 
@@ -43,11 +43,11 @@ export default function AppointmentsView({ patientName, onNewBooking, onReschedu
     setCancelling(true);
     try {
       await appointmentsAPI.cancel(appt.id);
-      toast.success(`Appointment with ${appt.doctor} cancelled.`);
+      toast.success(t(language, 'toast.cancelled', { doctor: appt.doctor }));
       setSelectedAppt(null);
       await loadData();
     } catch (err) {
-      toast.error(err.response?.data?.detail || 'Could not cancel the appointment.');
+      toast.error(err.response?.data?.detail || t(language, 'toast.cancelFailed'));
     } finally {
       setCancelling(false);
     }
@@ -58,7 +58,7 @@ export default function AppointmentsView({ patientName, onNewBooking, onReschedu
     if (!reminderDoctor || !reminderDate) return;
     const phone = userPhone || phoneOverride;
     if (!phone) {
-      toast.error('Please enter your phone number to receive the call.');
+      toast.error(t(language, 'toast.phoneNeeded'));
       return;
     }
     setReminderLoading(true);
@@ -70,14 +70,14 @@ export default function AppointmentsView({ patientName, onNewBooking, onReschedu
         date: reminderDate,
         time: combinedTime,
         delay_minutes: parseInt(reminderDelay) || 1,
-        language: 'English',
+        language: ({ en: 'English', hi: 'Hindi', ta: 'Tamil' })[language] || 'English',
       });
-      toast.success(res.data.message || `Call scheduled in ${reminderDelay} min!`);
+      toast.success(t(language, 'toast.callScheduled', { min: reminderDelay }));
       setReminderDoctor(''); setDocSearch(''); setReminderDate('');
       setReminderHour('10'); setReminderMinute('00'); setReminderPeriod('AM');
       setReminderDelay('1'); setPhoneOverride('');
     } catch (err) {
-      toast.error(err?.response?.data?.detail || 'Failed to schedule call.');
+      toast.error(err?.response?.data?.detail || t(language, 'toast.callFailed'));
     } finally {
       setReminderLoading(false);
     }
@@ -89,7 +89,6 @@ export default function AppointmentsView({ patientName, onNewBooking, onReschedu
   const currentYear = today.getFullYear();
   const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
   const firstDayOfMonth = new Date(currentYear, currentMonth, 1).getDay();
-  const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -110,7 +109,7 @@ export default function AppointmentsView({ patientName, onNewBooking, onReschedu
           <p>{t(language, 'view.appts.sub')}</p>
         </div>
         <div className="header-actions" style={{ display: 'flex', gap: '10px' }}>
-          <button className="primary-btn" onClick={onNewBooking} style={{ background: '#3b82f6', color: 'white', padding: '8px 16px', borderRadius: '8px', border: 'none', cursor: 'pointer' }}>+ New Booking</button>
+          <button className="primary-btn" onClick={onNewBooking} style={{ background: '#3b82f6', color: 'white', padding: '8px 16px', borderRadius: '8px', border: 'none', cursor: 'pointer' }}>{t(language, 'appts.newBooking')}</button>
         </div>
       </header>
 
@@ -119,11 +118,11 @@ export default function AppointmentsView({ patientName, onNewBooking, onReschedu
         {/* Calendar */}
         <div className="dashboard-card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-            <h3>{monthNames[currentMonth]} {currentYear}</h3>
+            <h3>{new Date(currentYear, currentMonth).toLocaleDateString(LOCALES[language], { month: 'long', year: 'numeric' })}</h3>
           </div>
 
           <div className="calendar-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '5px' }}>
-            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => <div key={day} style={{ textAlign: 'center', fontWeight: 600, color: '#64748b', padding: '5px' }}>{day}</div>)}
+            {Array.from({ length: 7 }, (_, i) => new Date(Date.UTC(2023, 0, 1 + i)).toLocaleDateString(LOCALES[language], { weekday: 'short' })).map(day => <div key={day} style={{ textAlign: 'center', fontWeight: 600, color: '#64748b', padding: '5px' }}>{day}</div>)}
 
             {Array.from({ length: firstDayOfMonth }).map((_, i) => (
               <div key={`empty-${i}`} style={{ background: 'transparent' }}></div>
@@ -169,16 +168,16 @@ export default function AppointmentsView({ patientName, onNewBooking, onReschedu
           {/* Reminder Widget */}
           <div className="dashboard-card" style={{ padding: '20px', border: '1px solid #e5e7eb', overflow: 'visible' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-              <span style={{ fontWeight: '700', fontSize: '15px', color: '#111827' }}>Set Appointment Reminder</span>
+              <span style={{ fontWeight: '700', fontSize: '15px', color: '#111827' }}>{t(language, 'appts.setReminder')}</span>
             </div>
 
             {/* Searchable Doctor Dropdown */}
             <div className="searchable-doc-container" style={{ marginBottom: '12px', position: 'relative' }}>
-              <label style={{ fontSize: '11px', fontWeight: '600', color: '#64748b', marginBottom: '6px', display: 'block', textTransform: 'uppercase' }}>Doctor</label>
+              <label style={{ fontSize: '11px', fontWeight: '600', color: '#64748b', marginBottom: '6px', display: 'block', textTransform: 'uppercase' }}>{t(language, 'appts.doctor')}</label>
               <div style={{ position: 'relative' }}>
                 <input
                   type="text"
-                  placeholder="Search & select doctor..."
+                  placeholder={t(language, 'appts.searchDoctor')}
                   value={docSearch || (reminderDoctor ? reminderDoctor : '')}
                   onFocus={() => setShowDocDropdown(true)}
                   onChange={(e) => {
@@ -213,7 +212,7 @@ export default function AppointmentsView({ patientName, onNewBooking, onReschedu
                         </div>
                       ))}
                     {doctorsList.length === 0 && (
-                      <div style={{ padding: '10px 12px', fontSize: '13px', color: '#94a3b8' }}>Loading doctors...</div>
+                      <div style={{ padding: '10px 12px', fontSize: '13px', color: '#94a3b8' }}>{t(language, 'appts.loadingDoctors')}</div>
                     )}
                   </div>
                 )}
@@ -223,7 +222,7 @@ export default function AppointmentsView({ patientName, onNewBooking, onReschedu
             {/* Date & Time Row */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '15px' }}>
               <div>
-                <label style={{ fontSize: '11px', fontWeight: '600', color: '#64748b', marginBottom: '6px', display: 'block', textTransform: 'uppercase' }}>Date</label>
+                <label style={{ fontSize: '11px', fontWeight: '600', color: '#64748b', marginBottom: '6px', display: 'block', textTransform: 'uppercase' }}>{t(language, 'appts.date')}</label>
                 <input
                   type="date"
                   value={reminderDate}
@@ -233,7 +232,7 @@ export default function AppointmentsView({ patientName, onNewBooking, onReschedu
                 />
               </div>
               <div>
-                <label style={{ fontSize: '11px', fontWeight: '600', color: '#64748b', marginBottom: '6px', display: 'block', textTransform: 'uppercase' }}>Time</label>
+                <label style={{ fontSize: '11px', fontWeight: '600', color: '#64748b', marginBottom: '6px', display: 'block', textTransform: 'uppercase' }}>{t(language, 'appts.time')}</label>
                 <div style={{ display: 'flex', gap: '4px' }}>
                   <select value={reminderHour} onChange={e => setReminderHour(e.target.value)} style={{ flex: 1, padding: '10px 4px', borderRadius: '8px', border: '1px solid #e2e8f0', background: '#f8fafc', fontSize: '12px', color: '#1e293b', outline: 'none', cursor: 'pointer' }}>
                     {Array.from({ length: 12 }).map((_, i) => (
@@ -253,20 +252,20 @@ export default function AppointmentsView({ patientName, onNewBooking, onReschedu
 
             {/* Delay Row */}
             <div style={{ marginBottom: '15px' }}>
-              <label style={{ fontSize: '11px', fontWeight: '600', color: '#64748b', marginBottom: '6px', display: 'block', textTransform: 'uppercase' }}>Call me in</label>
+              <label style={{ fontSize: '11px', fontWeight: '600', color: '#64748b', marginBottom: '6px', display: 'block', textTransform: 'uppercase' }}>{t(language, 'appts.callMeIn')}</label>
               <select value={reminderDelay} onChange={e => setReminderDelay(e.target.value)} style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #e2e8f0', background: '#f8fafc', fontSize: '13px', color: '#1e293b', outline: 'none', cursor: 'pointer' }}>
-                <option value="1">1 minute</option>
-                <option value="5">5 minutes</option>
-                <option value="15">15 minutes</option>
-                <option value="30">30 minutes</option>
-                <option value="60">1 hour</option>
+                <option value="1">{t(language, 'min.1')}</option>
+                <option value="5">{t(language, 'min.5')}</option>
+                <option value="15">{t(language, 'min.15')}</option>
+                <option value="30">{t(language, 'min.30')}</option>
+                <option value="60">{t(language, 'min.60')}</option>
               </select>
             </div>
 
             {/* Phone number */}
             {!userPhone && (
               <div style={{ marginBottom: '12px' }}>
-                <label style={{ fontSize: '11px', fontWeight: '600', color: '#64748b', marginBottom: '6px', display: 'block', textTransform: 'uppercase' }}>Your Phone Number</label>
+                <label style={{ fontSize: '11px', fontWeight: '600', color: '#64748b', marginBottom: '6px', display: 'block', textTransform: 'uppercase' }}>{t(language, 'appts.yourPhone')}</label>
                 <input
                   type="tel"
                   placeholder="+91XXXXXXXXXX"
@@ -278,7 +277,7 @@ export default function AppointmentsView({ patientName, onNewBooking, onReschedu
             )}
             {userPhone && (
               <div style={{ marginBottom: '12px', padding: '8px 12px', background: '#f0fdf4', borderRadius: '8px', border: '1px solid #bbf7d0', fontSize: '12px', color: '#166534' }}>
-                📞 Call will go to: <strong>{userPhone}</strong>
+                📞 {t(language, 'appts.callWillGo')} <strong>{userPhone}</strong>
               </div>
             )}
 
@@ -294,11 +293,11 @@ export default function AppointmentsView({ patientName, onNewBooking, onReschedu
                 transition: 'all 0.2s'
               }}
             >
-              {reminderLoading ? '⏳ Scheduling Call...' : '📞 Set Reminder & Call Me'}
+              {reminderLoading ? `⏳ ${t(language, 'appts.scheduling')}` : `📞 ${t(language, 'appts.setAndCall')}`}
             </button>
           </div>
 
-          <h3 style={{ marginTop: '10px' }}>Upcoming</h3>
+          <h3 style={{ marginTop: '10px' }}>{t(language, 'appts.upcoming')}</h3>
           {activeAppointments.map(appt => (
             <div
               key={appt.id}
@@ -314,30 +313,30 @@ export default function AppointmentsView({ patientName, onNewBooking, onReschedu
             </div>
           ))}
           {activeAppointments.length === 0 && (
-            <div style={{ color: '#64748b', fontSize: '0.9rem', padding: '10px' }}>No upcoming appointments.</div>
+            <div style={{ color: '#64748b', fontSize: '0.9rem', padding: '10px' }}>{t(language, 'appts.none')}</div>
           )}
 
           {/* Detail Drawer — real actions */}
           {selectedAppt && (
             <div className="detail-drawer" style={{ background: '#f8fafc', padding: '15px', borderRadius: '12px', marginTop: '10px', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.05)' }}>
-              <h4 style={{ margin: '0 0 10px 0' }}>Appointment Details</h4>
+              <h4 style={{ margin: '0 0 10px 0' }}>{t(language, 'appts.details')}</h4>
               <div style={{ fontSize: '0.85rem', color: '#475569', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <div><strong>Doctor:</strong> {selectedAppt.doctor}</div>
-                <div><strong>Date:</strong> {selectedAppt.date} at {selectedAppt.time}</div>
-                <div><strong>Booking ID:</strong> <code>{selectedAppt.id}</code></div>
+                <div><strong>{t(language, 'appts.doctor')}:</strong> {selectedAppt.doctor}</div>
+                <div><strong>{t(language, 'appts.date')}:</strong> {selectedAppt.date} • {selectedAppt.time}</div>
+                <div><strong>{t(language, 'appts.bookingId')}:</strong> <code>{selectedAppt.id}</code></div>
                 <div style={{ marginTop: '10px', display: 'flex', gap: '10px' }}>
                   <button
                     onClick={() => handleCancel(selectedAppt)}
                     disabled={cancelling}
                     style={{ padding: '6px 12px', background: 'white', border: '1px solid #ef4444', color: '#ef4444', borderRadius: '6px', cursor: 'pointer' }}
                   >
-                    {cancelling ? 'Cancelling…' : 'Cancel'}
+                    {cancelling ? t(language, 'appts.cancelling') : t(language, 'appts.cancel')}
                   </button>
                   <button
                     onClick={() => onReschedule?.(selectedAppt)}
                     style={{ padding: '6px 12px', background: 'white', border: '1px solid #3b82f6', color: '#3b82f6', borderRadius: '6px', cursor: 'pointer' }}
                   >
-                    Reschedule via chat
+                    {t(language, 'appts.reschedViaChat')}
                   </button>
                 </div>
               </div>
@@ -348,15 +347,15 @@ export default function AppointmentsView({ patientName, onNewBooking, onReschedu
 
       <div style={{ marginTop: '30px' }}>
         <div className="dashboard-card">
-          <h3>Tomorrow's Reminder Candidates</h3>
-          <p style={{ fontSize: '0.85rem', color: '#64748b', marginBottom: '15px' }}>Appointments scheduled for tomorrow — use the widget above to schedule a reminder call.</p>
+          <h3>{t(language, 'appts.tomorrowTitle')}</h3>
+          <p style={{ fontSize: '0.85rem', color: '#64748b', marginBottom: '15px' }}>{t(language, 'appts.tomorrowDesc')}</p>
           <table style={{ width: '100%', marginTop: '15px', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
             <thead>
               <tr style={{ textAlign: 'left', borderBottom: '2px solid #f1f5f9' }}>
-                <th style={{ padding: '10px' }}>Patient</th>
-                <th style={{ padding: '10px' }}>Doctor</th>
-                <th style={{ padding: '10px' }}>Date</th>
-                <th style={{ padding: '10px' }}>Time</th>
+                <th style={{ padding: '10px' }}>{t(language, 'appts.patient')}</th>
+                <th style={{ padding: '10px' }}>{t(language, 'appts.doctor')}</th>
+                <th style={{ padding: '10px' }}>{t(language, 'appts.date')}</th>
+                <th style={{ padding: '10px' }}>{t(language, 'appts.time')}</th>
               </tr>
             </thead>
             <tbody>
@@ -370,7 +369,7 @@ export default function AppointmentsView({ patientName, onNewBooking, onReschedu
               ))}
               {reminders.length === 0 && (
                 <tr>
-                  <td colSpan="4" style={{ padding: '20px', textAlign: 'center', color: '#64748b' }}>No appointments tomorrow</td>
+                  <td colSpan="4" style={{ padding: '20px', textAlign: 'center', color: '#64748b' }}>{t(language, 'appts.noTomorrow')}</td>
                 </tr>
               )}
             </tbody>

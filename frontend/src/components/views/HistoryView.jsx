@@ -15,7 +15,7 @@ export default function HistoryView() {
         setAppointments(res.data);
       } catch (err) {
         console.error('Failed to load history', err);
-        toast.error('Could not load your appointment history.');
+        toast.error(t(language, 'toast.loadHistory'));
       }
     };
     loadHistory();
@@ -42,24 +42,24 @@ export default function HistoryView() {
         {/* Left Column: real stats */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           <div className="dashboard-card" style={{ background: 'linear-gradient(135deg, #3b82f6, #2563eb)', color: 'white' }}>
-            <h3 style={{ color: 'rgba(255,255,255,0.8)' }}>Total Appointments</h3>
+            <h3 style={{ color: 'rgba(255,255,255,0.8)' }}>{t(language, 'hist.total')}</h3>
             <div style={{ fontSize: '2.5rem', fontWeight: 'bold', marginTop: '10px' }}>{total}</div>
           </div>
           <div className="dashboard-card" style={{ background: 'linear-gradient(135deg, #10b981, #059669)', color: 'white' }}>
-            <h3 style={{ color: 'rgba(255,255,255,0.8)' }}>Most Visited</h3>
+            <h3 style={{ color: 'rgba(255,255,255,0.8)' }}>{t(language, 'hist.mostVisited')}</h3>
             <div style={{ fontSize: '1.5rem', fontWeight: 'bold', marginTop: '10px' }}>{mostVisitedDoc}</div>
-            <div style={{ fontSize: '0.9rem', opacity: 0.8 }}>{mostVisitedCount} visits</div>
+            <div style={{ fontSize: '0.9rem', opacity: 0.8 }}>{t(language, 'hist.visits', { n: mostVisitedCount })}</div>
           </div>
           <div className="dashboard-card">
-            <h3>Cancellations</h3>
+            <h3>{t(language, 'hist.cancellations')}</h3>
             <div style={{ fontSize: '2rem', fontWeight: 'bold', marginTop: '10px', color: '#ef4444' }}>{cancelled}</div>
-            <div style={{ fontSize: '0.85rem', color: '#64748b' }}>of {total} total</div>
+            <div style={{ fontSize: '0.85rem', color: '#64748b' }}>{t(language, 'hist.ofTotal', { n: total })}</div>
           </div>
         </div>
 
         {/* Right Column: activity list */}
         <div className="dashboard-card">
-          <h3 style={{ marginBottom: '15px' }}>Recent Activity</h3>
+          <h3 style={{ marginBottom: '15px' }}>{t(language, 'hist.recent')}</h3>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {appointments.map((appt) => (
@@ -67,14 +67,14 @@ export default function HistoryView() {
                 <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
                   <div style={{ fontSize: '2rem' }}>{appt.status === 'cancelled' ? '❌' : '📅'}</div>
                   <div>
-                    <h4 style={{ margin: 0 }}>Appointment {appt.status === 'cancelled' ? 'Cancelled' : 'Booked'}</h4>
-                    <div style={{ fontSize: '0.85rem', color: '#64748b', marginTop: '5px' }}>{appt.date} at {appt.time} • {appt.doctor}</div>
+                    <h4 style={{ margin: 0 }}>{appt.status === 'cancelled' ? t(language, 'hist.cancelledItem') : t(language, 'hist.booked')}</h4>
+                    <div style={{ fontSize: '0.85rem', color: '#64748b', marginTop: '5px' }}>{appt.date} • {appt.time} • {appt.doctor}</div>
                   </div>
                 </div>
                 <span className={`status-tag ${appt.status === 'cancelled' ? 'cancelled' : 'confirmed'}`}>{appt.status}</span>
               </div>
             ))}
-            {appointments.length === 0 && <div style={{ textAlign: 'center', padding: '20px', color: '#64748b' }}>No activity yet</div>}
+            {appointments.length === 0 && <div style={{ textAlign: 'center', padding: '20px', color: '#64748b' }}>{t(language, 'hist.none')}</div>}
           </div>
         </div>
 

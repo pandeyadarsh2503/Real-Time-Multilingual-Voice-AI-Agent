@@ -16,7 +16,7 @@ export default function DoctorsView({ onBook }) {
         setDoctors(res.data);
       } catch (err) {
         console.error('Failed to load doctors', err);
-        toast.error('Could not load the doctor directory.');
+        toast.error(t(language, 'toast.loadDoctors'));
       }
     };
     fetchDocs();
@@ -36,7 +36,7 @@ export default function DoctorsView({ onBook }) {
         <div className="search-bar">
           <input
             type="text"
-            placeholder="Search by name, specialty..."
+            placeholder={t(language, 'docs.search')}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             style={{ padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', width: '300px' }}
@@ -61,7 +61,7 @@ export default function DoctorsView({ onBook }) {
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.85rem', color: '#475569' }}>
-              <div>🕒 Consults {doc.availability}</div>
+              <div>🕒 {t(language, 'docs.consults', { hours: doc.availability })}</div>
               <div>🗣️ {(doc.languages || []).join(', ')}</div>
             </div>
 
@@ -69,12 +69,12 @@ export default function DoctorsView({ onBook }) {
               style={{ width: '100%', padding: '10px', borderRadius: '8px', border: 'none', background: '#3b82f6', color: 'white', fontWeight: 600, cursor: 'pointer' }}
               onClick={() => onBook?.(doc.name)}
             >
-              Book Appointment
+              {t(language, 'qa.book')}
             </button>
           </div>
         ))}
         {filtered.length === 0 && doctors.length > 0 && (
-          <div style={{ color: '#64748b', padding: '20px' }}>No doctors match “{search}”.</div>
+          <div style={{ color: '#64748b', padding: '20px' }}>{t(language, 'docs.noMatch', { q: search })}</div>
         )}
       </div>
     </div>

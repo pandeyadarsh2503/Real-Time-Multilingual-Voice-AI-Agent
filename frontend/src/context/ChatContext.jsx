@@ -82,7 +82,7 @@ export function ChatProvider({ user, children }) {
       handleAIResponse(response, detectedLang || language)
       await playAudio(response, detectedLang || language)
     } catch (err) {
-      const errMsg = err.response?.data?.detail || 'Something went wrong. Please try again.'
+      const errMsg = err.response?.data?.detail || t(language, 'toast.genericError')
       toast.error(errMsg)
       handleAIResponse(errMsg, language)
       setMishap((m) => m + 1)   // helix shows the calm amber error state

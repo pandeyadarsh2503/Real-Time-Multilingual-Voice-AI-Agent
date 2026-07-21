@@ -80,21 +80,29 @@ export default function Login() {
 
     try {
       if (isRegister) {
-        if (!name.trim()) throw new Error('Please enter your name.')
-        if (!phone.trim()) throw new Error('Phone number is required for reminder calls.')
-        if (!email.trim()) throw new Error('Email address is required.')
-        if (!password.trim()) throw new Error('Password is required.')
+        if (!name.trim()) throw new Error(t(lang, 'val.name'))
+        if (!phone.trim()) throw new Error(t(lang, 'val.phone'))
+        if (!email.trim()) throw new Error(t(lang, 'val.email'))
+        if (!password.trim()) throw new Error(t(lang, 'val.password'))
 
         const userCred = await createUserWithEmailAndPassword(auth, email, password)
         await updateProfile(userCred.user, { displayName: name })
         localStorage.setItem(`phone_${userCred.user.uid}`, phone)
       } else {
-        if (!email.trim()) throw new Error('Email is required.')
-        if (!password.trim()) throw new Error('Password is required.')
+        if (!email.trim()) throw new Error(t(lang, 'val.email'))
+        if (!password.trim()) throw new Error(t(lang, 'val.password'))
         await signInWithEmailAndPassword(auth, email, password)
       }
     } catch (err) {
-      fail(err.message || 'Authentication failed')
+      const FB_ERRORS = {
+        'auth/invalid-credential': 'fb.invalidCredential',
+        'auth/wrong-password': 'fb.invalidCredential',
+        'auth/user-not-found': 'fb.invalidCredential',
+        'auth/email-already-in-use': 'fb.emailInUse',
+        'auth/weak-password': 'fb.weakPassword',
+        'auth/invalid-email': 'fb.invalidEmail',
+      }
+      fail(FB_ERRORS[err.code] ? t(lang, FB_ERRORS[err.code]) : (err.message || t(lang, 'fb.generic')))
     } finally {
       setLoading(false)
     }
@@ -107,9 +115,9 @@ export default function Login() {
       await signInWithPopup(auth, new GoogleAuthProvider())
     } catch (err) {
       if (err.code === 'auth/operation-not-allowed') {
-        fail('Google sign-in is not enabled yet — enable the Google provider in the Firebase console (Authentication → Sign-in method).')
+        fail(t(lang, 'fb.googleDisabled'))
       } else if (err.code !== 'auth/popup-closed-by-user' && err.code !== 'auth/cancelled-popup-request') {
-        fail(err.message || 'Google sign-in failed.')
+        fail(err.message || t(lang, 'fb.generic'))
       }
     } finally {
       setLoading(false)

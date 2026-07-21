@@ -1,4 +1,6 @@
 import { useEffect, useRef } from 'react'
+import { useChat } from '../context/ChatContext'
+import { t } from '../i18n'
 
 function formatTime(ts) {
   return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -40,6 +42,7 @@ function TypingIndicator() {
 }
 
 export default function ChatWindow({ messages, isThinking }) {
+  const { language } = useChat()
   const bottomRef = useRef(null)
 
   useEffect(() => {
@@ -55,9 +58,8 @@ export default function ChatWindow({ messages, isThinking }) {
           marginTop: 60,
         }}>
           <span style={{ fontSize: 48 }}>🏥</span>
-          <p style={{ fontSize: 13, textAlign: 'center', maxWidth: 260 }}>
-            Hello! I'm SwasthyaAI.<br />
-            Speak or type to book an appointment.
+          <p style={{ fontSize: 13, textAlign: 'center', maxWidth: 260, whiteSpace: 'pre-line' }}>
+            {t(language, 'chat.empty')}
           </p>
         </div>
       )}

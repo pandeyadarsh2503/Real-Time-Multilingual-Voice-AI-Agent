@@ -55,10 +55,10 @@ export default function ProfileView({ user }) {
       localStorage.setItem('patientCountryCode', countryCode);
       localStorage.setItem(`phone_${user.uid}`, phoneDigits);
       setIsEditing(false);
-      toast.success('Profile updated.');
+      toast.success(t(language, 'toast.profileSaved'));
     } catch (error) {
       console.error('Error updating profile:', error);
-      toast.error('Failed to update profile.');
+      toast.error(t(language, 'toast.profileFailed'));
     }
     setSaving(false);
   };
@@ -86,14 +86,14 @@ export default function ProfileView({ user }) {
                 type="text"
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
-                placeholder="Full Name"
+                placeholder={t(language, 'login.fullName')}
                 style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e1', textAlign: 'center', marginBottom: '10px' }}
               />
               <input
                 type="email"
                 value={user?.email || ''}
                 disabled
-                title="Email cannot be changed here"
+                title={t(language, 'profile.emailLocked')}
                 style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #e2e8f0', background: '#f8fafc', color: '#94a3b8', textAlign: 'center', marginBottom: '10px', cursor: 'not-allowed' }}
               />
               <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
@@ -110,23 +110,23 @@ export default function ProfileView({ user }) {
                   type="tel"
                   value={phoneDigits}
                   onChange={(e) => setPhoneDigits(e.target.value)}
-                  placeholder="Phone Number"
+                  placeholder={t(language, 'profile.phoneNumber')}
                   style={{ width: '65%', padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
                 />
               </div>
               <button onClick={handleSave} disabled={saving} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: 'none', background: '#3b82f6', color: 'white', fontWeight: 'bold', cursor: 'pointer' }}>
-                {saving ? 'Saving...' : 'Save Profile'}
+                {saving ? t(language, 'profile.saving') : t(language, 'profile.save')}
               </button>
               <button onClick={() => setIsEditing(false)} disabled={saving} style={{ width: '100%', padding: '10px', marginTop: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', background: 'white', cursor: 'pointer' }}>
-                Cancel
+                {t(language, 'profile.cancel')}
               </button>
             </div>
           ) : (
             <>
-              <h2 style={{ margin: 0 }}>{user?.displayName || 'Guest User'}</h2>
+              <h2 style={{ margin: 0 }}>{user?.displayName || t(language, 'profile.guest')}</h2>
               <div style={{ color: '#64748b', marginTop: '5px' }}>{user?.email}</div>
               {phoneDigits && <div style={{ color: '#64748b', marginTop: '2px' }}>{countryCode} {phoneDigits}</div>}
-              <button onClick={() => setIsEditing(true)} style={{ width: '100%', padding: '10px', marginTop: '20px', borderRadius: '8px', border: '1px solid #cbd5e1', background: 'white', cursor: 'pointer' }}>Edit Profile</button>
+              <button onClick={() => setIsEditing(true)} style={{ width: '100%', padding: '10px', marginTop: '20px', borderRadius: '8px', border: '1px solid #cbd5e1', background: 'white', cursor: 'pointer' }}>{t(language, 'profile.edit')}</button>
             </>
           )}
         </div>
@@ -134,33 +134,31 @@ export default function ProfileView({ user }) {
         {/* Real booking activity */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           <div className="dashboard-card">
-            <h3>Your Activity</h3>
+            <h3>{t(language, 'profile.activity')}</h3>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '15px', marginTop: '20px' }}>
               <div style={{ background: '#f8fafc', padding: '15px', borderRadius: '8px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
                 <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#1e293b' }}>{stats.total}</div>
-                <div style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: '5px' }}>Total appointments</div>
+                <div style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: '5px' }}>{t(language, 'health.total')}</div>
               </div>
               <div style={{ background: '#f0fdf4', padding: '15px', borderRadius: '8px', border: '1px solid #bbf7d0', textAlign: 'center' }}>
                 <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#166534' }}>{stats.upcoming}</div>
-                <div style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: '5px' }}>Upcoming</div>
+                <div style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: '5px' }}>{t(language, 'health.upcoming')}</div>
               </div>
               <div style={{ background: '#eff6ff', padding: '15px', borderRadius: '8px', border: '1px solid #bfdbfe', textAlign: 'center' }}>
                 <div style={{ fontSize: '1rem', fontWeight: 'bold', color: '#1d4ed8', marginTop: '8px' }}>
                   {stats.favouriteDoctor ? stats.favouriteDoctor.name : '—'}
                 </div>
                 <div style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: '5px' }}>
-                  {stats.favouriteDoctor ? `Most visited (${stats.favouriteDoctor.visits}×)` : 'No visits yet'}
+                  {stats.favouriteDoctor ? t(language, 'profile.mostVisited', { n: stats.favouriteDoctor.visits }) : t(language, 'profile.noVisits')}
                 </div>
               </div>
             </div>
           </div>
 
           <div className="dashboard-card" style={{ background: '#f8fafc', border: '1px dashed #cbd5e1' }}>
-            <h3 style={{ margin: 0, fontSize: '0.95rem' }}>ℹ️ How your data is used</h3>
+            <h3 style={{ margin: 0, fontSize: '0.95rem' }}>{t(language, 'profile.dataTitle')}</h3>
             <p style={{ fontSize: '0.85rem', color: '#64748b', marginTop: '10px', lineHeight: 1.5 }}>
-              The assistant remembers your preferred doctor and language from past bookings to speed up
-              future conversations. Appointments are linked to your account — only you (and clinic staff)
-              can see or cancel them.
+              {t(language, 'profile.dataDesc')}
             </p>
           </div>
         </div>

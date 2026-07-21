@@ -2,6 +2,7 @@ import { onAuthStateChanged, signOut } from 'firebase/auth'
 import { useCallback, useEffect, useState } from 'react'
 import toast, { Toaster } from 'react-hot-toast'
 import { auth } from './firebase'
+import { t } from './i18n'
 import { appointmentsAPI, doctorsAPI } from './services/api'
 
 import { ChatProvider, useChat } from './context/ChatContext'
@@ -53,7 +54,7 @@ export default function App() {
   }
 
   if (authLoading) {
-    return <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center' }}>Loading...</div>
+    return <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center' }}>{t(langNow(), 'app.loading')}</div>
   }
 
   if (!user) {
@@ -73,8 +74,10 @@ export default function App() {
   )
 }
 
+const langNow = () => localStorage.getItem('preferredLang') || 'en'
+
 function AuthedApp({ user, userPhone }) {
-  const { sendChatMessage, patientName } = useChat()
+  const { sendChatMessage, patientName, language } = useChat()
   const [activeTab, setActiveTab] = useState('Home')
   const [dashboardData, setDashboardData] = useState({
     upcomingAppointment: null,
@@ -119,7 +122,7 @@ function AuthedApp({ user, userPhone }) {
         console.error('Failed to load dashboard data:', err)
         if (!failedOnce) {
           failedOnce = true
-          toast.error('Could not reach the server — retrying in the background.')
+          toast.error(t(langNow(), 'toast.serverUnreachable'))
         }
       }
     }
@@ -145,12 +148,12 @@ function AuthedApp({ user, userPhone }) {
           <AppointmentsView
             patientName={patientName}
             userPhone={userPhone}
-            onNewBooking={() => chatHandoff('I want to book a new appointment. Which doctors are available and when?')}
-            onReschedule={(appt) => chatHandoff(`I want to reschedule my appointment ${appt.id} with ${appt.doctor} on ${appt.date}.`)}
+            onNewBooking={() => chatHandoff(t(language, 'prompt.newBooking'))}
+            onReschedule={(appt) => chatHandoff(t(language, 'prompt.reschedule', { id: appt.id, doctor: appt.doctor, date: appt.date }))}
           />
         )
       case 'Doctors':
-        return <DoctorsView onBook={(docName) => chatHandoff(`I want to book an appointment with ${docName}`)} />
+        return <DoctorsView onBook={(docName) => chatHandoff(t(language, 'prompt.bookWith', { doctor: docName }))} />
       case 'History':
         return <HistoryView />
       case 'Health':

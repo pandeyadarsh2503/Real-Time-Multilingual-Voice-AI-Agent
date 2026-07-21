@@ -92,7 +92,7 @@ export function useVoiceSession() {
     if (!ptt.isRecording) {
       const ok = await ptt.startRecording()
       if (ok) setStatus('listening')
-      else toast.error('Microphone access was denied.')
+      else toast.error(t(language, 'toast.micDenied'))
     } else {
       const blob = await ptt.stopRecording()
       if (!blob) return
@@ -103,14 +103,14 @@ export function useVoiceSession() {
         const { text, language: detectedLang } = sttRes.data
 
         if (!text.trim()) {
-          toast('No speech detected — please try again.', { icon: '🎤' })
+          toast(t(language, 'toast.noSpeech'), { icon: '🎤' })
           setStatus('ready')
           return
         }
         if (detectedLang) setLanguage(detectedLang)
         await sendChatMessage(text)
       } catch (err) {
-        toast.error(err.response?.data?.detail || 'Transcription failed. Please try again.')
+        toast.error(err.response?.data?.detail || t(language, 'toast.sttFailed'))
         setStatus('ready')
       }
     }

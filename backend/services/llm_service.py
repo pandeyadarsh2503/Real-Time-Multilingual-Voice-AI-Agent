@@ -48,6 +48,7 @@ STRICT RULES:
 - Do NOT assume confirmation.
 - Do NOT hallucinate any information not provided.
 - Do NOT exceed 2 sentences.
+- NEVER translate or transliterate names, doctor names, IDs, phone numbers, dates or times — say them as given.
 
 OUTPUT FORMAT:
 Return ONLY the spoken message text. No JSON. No extra explanation.
@@ -61,6 +62,7 @@ You communicate naturally in English, Hindi, and Tamil.
 ━━ LANGUAGE RULES ━━
 {lang_directive}
 • Hindi → Devanagari script | Tamil → Tamil script | English → English
+• NEVER translate or transliterate: the brand name "SwasthyaAI", doctor names, patient names, appointment IDs, email addresses, phone numbers, dates and times — keep them EXACTLY as given, in every language.
 • Keep responses SHORT and CONVERSATIONAL: 1–2 sentences maximum.
 
 ━━ CLINIC ━━
@@ -214,11 +216,23 @@ def _lang_directive(reply_language: str | None) -> str:
     """The app's language selector overrides per-message detection."""
     if reply_language in LANG_NAMES:
         name, script = LANG_NAMES[reply_language]
-        return (
+        directive = (
             f"• APP LANGUAGE: the user selected {name} in the app. "
-            f"Reply ONLY in {name} ({script}) for EVERY message, regardless "
-            f"of which language the user writes or speaks in."
+            f"EVERY reply — including confirmations, questions and error messages — "
+            f"must be written ONLY in {name} ({script}), no matter which language "
+            f"the user message or the tool results are in. Never fall back to English."
         )
+        if reply_language != "en":
+            directive += (
+                "\n• CRITICAL EXCEPTION — NEVER translate or transliterate proper nouns and data: "
+                "\"SwasthyaAI\", doctor names, patient names, appointment IDs, emails, "
+                "phone numbers, dates and times stay EXACTLY as given, in Latin script, "
+                "even inside a sentence in another script. Do NOT attach case suffixes to the "
+                "Latin name — restructure the sentence around it instead.\n"
+                "  WRONG: 'डॉ शर्मा', 'டாக்டர் சர்மாவுடன்'\n"
+                "  RIGHT: 'Dr Sharma के साथ', 'Dr Sharma உடன் உங்கள் சந்திப்பு'"
+            )
+        return directive
     return DEFAULT_LANG_RULES
 
 

@@ -52,25 +52,25 @@ export default function SettingsView() {
           onClick={runChecks}
           style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid #cbd5e1', background: 'white', cursor: 'pointer', fontWeight: 600 }}
         >
-          ↻ Re-check
+          {t(language, 'set.recheck')}
         </button>
       </header>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginTop: '20px' }}>
 
         <div className="dashboard-card">
-          <h3>Backend Health</h3>
+          <h3>{t(language, 'set.backend')}</h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', marginTop: '20px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <div style={{ fontWeight: 600 }}>API server (liveness)</div>
+                <div style={{ fontWeight: 600 }}>{t(language, 'set.liveness')}</div>
                 <div style={{ fontSize: '0.85rem', color: '#64748b' }}>GET /health</div>
               </div>
               {health !== null && <Badge ok={health} />}
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <div style={{ fontWeight: 600 }}>Readiness</div>
+                <div style={{ fontWeight: 600 }}>{t(language, 'set.readiness')}</div>
                 <div style={{ fontSize: '0.85rem', color: '#64748b' }}>GET /health/ready</div>
               </div>
               {ready && <Badge ok={ready.status === 'ready'} labels={['READY', ready.status?.toUpperCase() || 'DOWN']} />}
@@ -81,34 +81,33 @@ export default function SettingsView() {
                 <Badge ok={state === 'ok'} />
               </div>
             ))}
-            {checkedAt && <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Last checked {checkedAt}</div>}
+            {checkedAt && <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{t(language, 'set.lastChecked', { t: checkedAt })}</div>}
           </div>
         </div>
 
         <div className="dashboard-card">
-          <h3>Session</h3>
+          <h3>{t(language, 'set.session')}</h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '20px', fontSize: '0.9rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: '#64748b' }}>Chat session ID</span>
+              <span style={{ color: '#64748b' }}>{t(language, 'set.sessionId')}</span>
               <code style={{ background: '#f1f5f9', padding: '2px 8px', borderRadius: '4px', fontSize: '0.8rem' }}>{sessionId.slice(0, 13)}…</code>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: '#64748b' }}>Active language</span>
-              <strong>{{ en: 'English', hi: 'Hindi', ta: 'Tamil' }[language] || language}</strong>
+              <span style={{ color: '#64748b' }}>{t(language, 'set.activeLang')}</span>
+              <strong>{t(language, `langName.${language}`)}</strong>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: '#64748b' }}>Doctors available</span>
+              <span style={{ color: '#64748b' }}>{t(language, 'set.doctorsAvail')}</span>
               <strong>{doctorsCount ?? '—'}</strong>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: '#64748b' }}>Voice modes</span>
+              <span style={{ color: '#64748b' }}>{t(language, 'set.voiceModes')}</span>
               <strong>Live (WebRTC) · Push-to-talk</strong>
             </div>
           </div>
 
           <div style={{ marginTop: '20px', padding: '12px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '0.8rem', color: '#64748b', lineHeight: 1.5 }}>
-            Conversations expire automatically after 30 minutes of inactivity.
-            Transcripts are retained for 30 days, then deleted.
+            {t(language, 'set.privacy')}
           </div>
         </div>
 
