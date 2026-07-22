@@ -32,9 +32,11 @@ export default function VoiceInterface({ session, disabled }) {
           className={`mic-inline-btn ${live ? 'recording' : ''}`}
           onClick={toggleLive}
           disabled={connecting}
-          title={live ? 'End live conversation' : 'Start live conversation'}
+          title={live ? t(language, 'aria.endLive') : t(language, 'aria.live')}
+          aria-label={live ? t(language, 'aria.endLive') : t(language, 'aria.live')}
+          aria-pressed={live}
         >
-          {connecting ? '⏳' : live ? '🔴' : '🎧'}
+          <span aria-hidden="true">{connecting ? '⏳' : live ? '🔴' : '🎧'}</span>
         </button>
 
         {/* Push-to-talk mic */}
@@ -42,14 +44,17 @@ export default function VoiceInterface({ session, disabled }) {
           className={`mic-inline-btn ${isRecording ? 'recording' : ''}`}
           onClick={handleMic}
           disabled={disabled || live}
-          title="Push-to-talk"
+          title={isRecording ? t(language, 'aria.stopMic') : t(language, 'aria.mic')}
+          aria-label={isRecording ? t(language, 'aria.stopMic') : t(language, 'aria.mic')}
+          aria-pressed={isRecording}
         >
-          {isRecording ? '⏹' : '🎤'}
+          <span aria-hidden="true">{isRecording ? '⏹' : '🎤'}</span>
         </button>
 
         {/* Text input */}
         <input
           className="input-field"
+          aria-label={t(language, 'chat.placeholder')}
           placeholder={live ? t(language, 'chat.liveInProgress') : t(language, 'chat.placeholder')}
           value={textValue}
           onChange={(e) => setTextValue(e.target.value)}
@@ -61,9 +66,10 @@ export default function VoiceInterface({ session, disabled }) {
         <button
           className="input-send"
           onClick={handleTextSend}
+          aria-label={t(language, 'aria.send')}
           disabled={!textValue.trim() || disabled || isRecording || live}
         >
-          ➤
+          <span aria-hidden="true">➤</span>
         </button>
       </div>
 

@@ -12,24 +12,26 @@ export default function HealthSummaryView({ onTalk }) {
   const { language } = useChat();
   const [appointments, setAppointments] = useState(null);
   const [upcoming, setUpcoming] = useState([]);
+  const [loadError, setLoadError] = useState(false);
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const [allRes, upRes] = await Promise.all([
-          appointmentsAPI.list(),
-          appointmentsAPI.upcoming(10),
-        ]);
-        setAppointments(allRes.data);
-        setUpcoming(upRes.data);
-      } catch (err) {
-        console.error('Failed to load health summary', err);
-        toast.error(t(language, 'toast.loadSummary'));
-        setAppointments([]);
-      }
-    };
-    load();
-  }, []);
+  const load = async () => {
+    try {
+      setLoadError(false);
+      const [allRes, upRes] = await Promise.all([
+        appointmentsAPI.list(),
+        appointmentsAPI.upcoming(10),
+      ]);
+      setAppointments(allRes.data);
+      setUpcoming(upRes.data);
+    } catch (err) {
+      console.error('Failed to load health summary', err);
+      // Don't coerce to [] — that renders "no activity" for a failed load.
+      setLoadError(true);
+      toast.error(t(language, 'toast.loadSummary'));
+    }
+  };
+
+  useEffect(() => { load(); }, []);
 
   const all = appointments || [];
   const cancelled = all.filter((a) => a.status === 'cancelled').length;
@@ -55,7 +57,14 @@ export default function HealthSummaryView({ onTalk }) {
         </div>
       </header>
 
-      {appointments === null ? (
+      {appointments === null && loadError ? (
+        <div style={{ color: '#64748b', padding: '30px 10px' }}>
+          {t(language, 'state.loadError')}{' '}
+          <button onClick={load} style={{ background: 'none', border: 'none', color: '#2563eb', fontWeight: 600, cursor: 'pointer' }}>
+            {t(language, 'state.retry')}
+          </button>
+        </div>
+      ) : appointments === null ? (
         <div style={{ color: '#64748b', padding: '30px 10px' }}>{t(language, 'health.loading')}</div>
       ) : all.length === 0 ? (
         <div className="dashboard-card" style={{ marginTop: '20px', textAlign: 'center', padding: '48px 24px' }}>
@@ -87,7 +96,7 @@ export default function HealthSummaryView({ onTalk }) {
                 <div style={{ fontSize: '0.95rem', color: '#334155', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   <div><strong>{next.doctor}</strong></div>
                   <div>🗓️ {next.date} • {next.time}</div>
-                  <span className={`status-tag ${next.status}`} style={{ alignSelf: 'flex-start' }}>{next.status}</span>
+                  <span className={`status-tag ${next.status}`} style={{ alignSelf: 'flex-start' }}>{t(language, `status.${next.status}`)}</span>
                 </div>
               ) : (
                 <p style={{ color: '#64748b', fontSize: '0.9rem' }}>{t(language, 'health.noneScheduled')}</p>

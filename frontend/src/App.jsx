@@ -1,5 +1,5 @@
 import { onAuthStateChanged, signOut } from 'firebase/auth'
-import { useCallback, useEffect, useState } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useState } from 'react'
 import toast, { Toaster } from 'react-hot-toast'
 import { auth } from './firebase'
 import { t } from './i18n'
@@ -7,16 +7,20 @@ import { appointmentsAPI, doctorsAPI } from './services/api'
 
 import { ChatProvider, useChat } from './context/ChatContext'
 
+import ErrorBoundary from './components/ErrorBoundary'
 import LeftSidebar from './components/LeftSidebar'
 import Login from './components/Login'
 import SplashScreen from './components/SplashScreen'
-import AppointmentsView from './components/views/AppointmentsView'
-import DoctorsView from './components/views/DoctorsView'
-import HealthSummaryView from './components/views/HealthSummaryView'
-import HistoryView from './components/views/HistoryView'
 import HomeView from './components/views/HomeView'
-import ProfileView from './components/views/ProfileView'
-import SettingsView from './components/views/SettingsView'
+
+// Secondary views are code-split so the initial bundle is just the splash,
+// login, and Home — the rest load on demand when their tab is opened.
+const AppointmentsView = lazy(() => import('./components/views/AppointmentsView'))
+const DoctorsView = lazy(() => import('./components/views/DoctorsView'))
+const HealthSummaryView = lazy(() => import('./components/views/HealthSummaryView'))
+const HistoryView = lazy(() => import('./components/views/HistoryView'))
+const ProfileView = lazy(() => import('./components/views/ProfileView'))
+const SettingsView = lazy(() => import('./components/views/SettingsView'))
 
 // ── Main App ──────────────────────────────────────────────
 export default function App() {
@@ -90,45 +94,48 @@ function AuthedApp({ user, userPhone }) {
     ],
   })
 
-  // Dashboard data polling
+  // The doctor directory is immutable config — fetch it once, not on a timer.
+  useEffect(() => {
+    let cancelled = false
+    doctorsAPI.list()
+      .then((res) => {
+        if (cancelled) return
+        const docs = res.data.map((d) => ({
+          id: d.name, name: d.name, specialty: d.specialty, icon: d.icon,
+        }))
+        setDashboardData((prev) => ({ ...prev, recentDoctors: docs }))
+      })
+      .catch((err) => console.error('Failed to load doctors:', err))
+    return () => { cancelled = true }
+  }, [])
+
+  // Upcoming appointment changes rarely — poll it, but far less aggressively
+  // than before (was every 15s, hammering an authenticated endpoint).
   useEffect(() => {
     let failedOnce = false
-    const fetchDashboardData = async () => {
+    const fetchUpcoming = async () => {
       try {
-        const [upcomingRes, doctorsRes] = await Promise.all([
-          appointmentsAPI.upcoming(1),
-          doctorsAPI.list(),
-        ])
-
+        const upcomingRes = await appointmentsAPI.upcoming(1)
         const apt = upcomingRes.data?.[0]
         const upcomingAppointment = apt ? {
           id: apt.id,
           doctorName: apt.doctor,
-          status: apt.status === 'scheduled' ? 'Confirmed' : apt.status,
+          status: apt.status,   // localized in the view via status.* keys
           date: apt.date,
           time: apt.time,
         } : null
-
-        const docs = doctorsRes.data.map((d) => ({
-          id: d.name,
-          name: d.name,
-          specialty: d.specialty,
-          icon: d.icon,
-        }))
-
-        setDashboardData((prev) => ({ ...prev, upcomingAppointment, recentDoctors: docs }))
+        setDashboardData((prev) => ({ ...prev, upcomingAppointment }))
         failedOnce = false
       } catch (err) {
-        console.error('Failed to load dashboard data:', err)
+        console.error('Failed to load upcoming appointment:', err)
         if (!failedOnce) {
           failedOnce = true
           toast.error(t(langNow(), 'toast.serverUnreachable'))
         }
       }
     }
-
-    fetchDashboardData()
-    const intervalId = setInterval(fetchDashboardData, 15000)
+    fetchUpcoming()
+    const intervalId = setInterval(fetchUpcoming, 60000)
     return () => clearInterval(intervalId)
   }, [])
 
@@ -171,7 +178,13 @@ function AuthedApp({ user, userPhone }) {
     <div className="app-container">
       <LeftSidebar activeTab={activeTab} setActiveTab={setActiveTab} onLogout={handleLogout} />
       <main className="center-content full-width" style={{ position: 'relative' }}>
-        {renderActiveView()}
+        {/* A broken view degrades to a panel, not a white screen; key resets
+            the boundary when the user switches tabs. */}
+        <ErrorBoundary compact key={activeTab}>
+          <Suspense fallback={<div style={{ padding: 32, color: '#64748b' }}>{t(language, 'app.loading')}</div>}>
+            {renderActiveView()}
+          </Suspense>
+        </ErrorBoundary>
       </main>
     </div>
   )

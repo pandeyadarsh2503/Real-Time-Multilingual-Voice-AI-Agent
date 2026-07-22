@@ -8,19 +8,21 @@ export default function DoctorsView({ onBook }) {
   const { language } = useChat();
   const [doctors, setDoctors] = useState([]);
   const [search, setSearch] = useState('');
+  const [loadError, setLoadError] = useState(false);
 
-  useEffect(() => {
-    const fetchDocs = async () => {
-      try {
-        const res = await doctorsAPI.list();
-        setDoctors(res.data);
-      } catch (err) {
-        console.error('Failed to load doctors', err);
-        toast.error(t(language, 'toast.loadDoctors'));
-      }
-    };
-    fetchDocs();
-  }, []);
+  const fetchDocs = async () => {
+    try {
+      setLoadError(false);
+      const res = await doctorsAPI.list();
+      setDoctors(res.data);
+    } catch (err) {
+      console.error('Failed to load doctors', err);
+      setLoadError(true);
+      toast.error(t(language, 'toast.loadDoctors'));
+    }
+  };
+
+  useEffect(() => { fetchDocs(); }, []);
 
   const filtered = doctors.filter((d) =>
     `${d.name} ${d.specialty}`.toLowerCase().includes(search.toLowerCase())
@@ -75,6 +77,14 @@ export default function DoctorsView({ onBook }) {
         ))}
         {filtered.length === 0 && doctors.length > 0 && (
           <div style={{ color: '#64748b', padding: '20px' }}>{t(language, 'docs.noMatch', { q: search })}</div>
+        )}
+        {doctors.length === 0 && loadError && (
+          <div style={{ color: '#64748b', padding: '20px' }}>
+            {t(language, 'state.loadError')}{' '}
+            <button onClick={fetchDocs} style={{ background: 'none', border: 'none', color: '#2563eb', fontWeight: 600, cursor: 'pointer' }}>
+              {t(language, 'state.retry')}
+            </button>
+          </div>
         )}
       </div>
     </div>

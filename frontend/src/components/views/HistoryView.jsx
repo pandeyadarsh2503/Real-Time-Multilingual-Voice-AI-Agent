@@ -7,19 +7,21 @@ import { appointmentsAPI } from '../../services/api';
 export default function HistoryView() {
   const { language } = useChat();
   const [appointments, setAppointments] = useState([]);
+  const [loadError, setLoadError] = useState(false);
 
-  useEffect(() => {
-    const loadHistory = async () => {
-      try {
-        const res = await appointmentsAPI.list();
-        setAppointments(res.data);
-      } catch (err) {
-        console.error('Failed to load history', err);
-        toast.error(t(language, 'toast.loadHistory'));
-      }
-    };
-    loadHistory();
-  }, []);
+  const loadHistory = async () => {
+    try {
+      setLoadError(false);
+      const res = await appointmentsAPI.list();
+      setAppointments(res.data);
+    } catch (err) {
+      console.error('Failed to load history', err);
+      setLoadError(true);   // don't render "no history" for a failed load
+      toast.error(t(language, 'toast.loadHistory'));
+    }
+  };
+
+  useEffect(() => { loadHistory(); }, []);
 
   const total = appointments.length;
   const cancelled = appointments.filter((a) => a.status === 'cancelled').length;
@@ -71,10 +73,18 @@ export default function HistoryView() {
                     <div style={{ fontSize: '0.85rem', color: '#64748b', marginTop: '5px' }}>{appt.date} • {appt.time} • {appt.doctor}</div>
                   </div>
                 </div>
-                <span className={`status-tag ${appt.status === 'cancelled' ? 'cancelled' : 'confirmed'}`}>{appt.status}</span>
+                <span className={`status-tag ${appt.status === 'cancelled' ? 'cancelled' : 'confirmed'}`}>{t(language, `status.${appt.status}`)}</span>
               </div>
             ))}
-            {appointments.length === 0 && <div style={{ textAlign: 'center', padding: '20px', color: '#64748b' }}>{t(language, 'hist.none')}</div>}
+            {appointments.length === 0 && loadError && (
+              <div style={{ textAlign: 'center', padding: '20px', color: '#64748b' }}>
+                {t(language, 'state.loadError')}{' '}
+                <button onClick={loadHistory} style={{ background: 'none', border: 'none', color: '#2563eb', fontWeight: 600, cursor: 'pointer' }}>
+                  {t(language, 'state.retry')}
+                </button>
+              </div>
+            )}
+            {appointments.length === 0 && !loadError && <div style={{ textAlign: 'center', padding: '20px', color: '#64748b' }}>{t(language, 'hist.none')}</div>}
           </div>
         </div>
 

@@ -1,5 +1,21 @@
 import { useCallback, useRef, useState } from 'react'
+import { t } from '../i18n'
 import api from '../services/api'
+
+// ICE servers for the browser peer. STUN lets us discover our public address;
+// TURN (optional, from env) relays when a peer is behind symmetric NAT.
+const ICE_SERVERS = (() => {
+  const servers = [{ urls: import.meta.env.VITE_STUN_URL || 'stun:stun.l.google.com:19302' }]
+  const turn = (import.meta.env.VITE_TURN_URLS || '').split(',').map((s) => s.trim()).filter(Boolean)
+  if (turn.length) {
+    servers.push({
+      urls: turn,
+      username: import.meta.env.VITE_TURN_USERNAME || undefined,
+      credential: import.meta.env.VITE_TURN_CREDENTIAL || undefined,
+    })
+  }
+  return servers
+})()
 
 /**
  * useLiveVoice — real WebRTC streaming conversation.
@@ -71,7 +87,7 @@ export function useLiveVoice({ onPartial, onFinal, onAgentResponse, onState, onT
       analyserRef.current = analyser
       levelBufRef.current = new Uint8Array(analyser.frequencyBinCount)
 
-      const pc = new RTCPeerConnection()
+      const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS })
       pcRef.current = pc
       stream.getTracks().forEach((t) => pc.addTrack(t, stream))
 
@@ -130,7 +146,8 @@ export function useLiveVoice({ onPartial, onFinal, onAgentResponse, onState, onT
       onState?.('listening')
     } catch (err) {
       console.error('Live voice failed to start:', err)
-      onError?.(err.response?.data?.detail || 'Could not start live voice.')
+      const lang = localStorage.getItem('preferredLang') || 'en'
+      onError?.(err.response?.data?.detail || t(lang, 'toast.liveFailed'))
       stop()
     } finally {
       setConnecting(false)

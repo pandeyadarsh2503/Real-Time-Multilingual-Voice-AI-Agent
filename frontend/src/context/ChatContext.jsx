@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import toast from 'react-hot-toast'
 import { v4 as uuidv4 } from 'uuid'
 import { t } from '../i18n'
@@ -103,7 +103,9 @@ export function ChatProvider({ user, children }) {
     }
   }, [user]) // eslint-disable-line
 
-  const value = {
+  // Memoised so consumers (the whole authed view tree) don't re-render on
+  // every provider render — only when a value they use actually changes.
+  const value = useMemo(() => ({
     sessionId,
     messages,
     status,
@@ -116,7 +118,8 @@ export function ChatProvider({ user, children }) {
     handleAIResponse,
     celebration,
     mishap,
-  }
+  }), [sessionId, messages, status, language, patientName,
+       sendChatMessage, handleUserMessage, handleAIResponse, celebration, mishap])
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>
 }

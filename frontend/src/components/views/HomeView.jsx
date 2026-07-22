@@ -31,7 +31,8 @@ export default function HomeView({ dashboardData, setActiveTab }) {
           </div>
           <button
             onClick={() => setActiveTab('Profile')}
-            title="My Profile"
+            title={t(language, 'nav.profile')}
+            aria-label={t(language, 'nav.profile')}
             style={{
               width: '40px', height: '40px', borderRadius: '50%', background: '#3b82f6',
               display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem',
@@ -66,7 +67,7 @@ export default function HomeView({ dashboardData, setActiveTab }) {
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
               <div style={{ fontWeight: 'bold', color: '#111827', fontSize: '15px' }}>{dashboardData.upcomingAppointment.doctorName}</div>
-              <span style={{ background: '#dcfce7', color: '#166534', padding: '4px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: '600' }}>{dashboardData.upcomingAppointment.status}</span>
+              <span style={{ background: '#dcfce7', color: '#166534', padding: '4px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: '600' }}>{t(language, `status.${dashboardData.upcomingAppointment.status}`)}</span>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '13px', color: '#4b5563' }}>
               <div style={{ display: 'flex', gap: '8px' }}><span>🗓️</span> {dashboardData.upcomingAppointment.date}</div>
@@ -116,7 +117,12 @@ export default function HomeView({ dashboardData, setActiveTab }) {
                 const initials = doc.name.replace(/^Dr\.?\s*/i, '').split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase();
                 return (
                   <React.Fragment key={doc.id}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }} onClick={() => sendChatMessage(`I want to book an appointment with ${doc.name}`)}>
+                    <button
+                      type="button"
+                      aria-label={t(language, 'prompt.bookWith', { doctor: doc.name })}
+                      onClick={() => sendChatMessage(t(language, 'prompt.bookWith', { doctor: doc.name }))}
+                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', width: '100%', background: 'none', border: 'none', padding: 0, font: 'inherit', textAlign: 'left' }}
+                    >
                       <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
                         <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: bg, color: fg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700', fontSize: '13px' }}>
                           {initials}
@@ -127,7 +133,7 @@ export default function HomeView({ dashboardData, setActiveTab }) {
                         </div>
                       </div>
                       <span style={{ color: '#94a3b8' }}>›</span>
-                    </div>
+                    </button>
                     {index < 2 && index < dashboardData.recentDoctors.length - 1 && (
                       <div style={{ height: '1px', background: '#f3f4f6' }}></div>
                     )}

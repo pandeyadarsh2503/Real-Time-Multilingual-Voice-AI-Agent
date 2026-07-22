@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
+import { t } from '../i18n'
 import DnaHelix from './ui/DnaHelix'
+
+const _splashLang = () => localStorage.getItem('preferredLang') || 'en'
 
 /**
  * Cinematic splash — the product thesis told in ~5 seconds:
@@ -269,16 +272,16 @@ export default function SplashScreen({ ready, autoDismiss, onDone }) {
           <span key={i} style={{ '--ld': `${i * 55}ms` }}>{ch}</span>
         ))}
       </div>
-      <div className="cine__tagline">Your AI healthcare companion — book, manage &amp; get reminded, by voice.</div>
+      <div className="cine__tagline">{t(_splashLang(), 'splash.tagline')}</div>
       <div className="cine__langs">English · हिन्दी · தமிழ்</div>
 
       <div className="cine__foot">
         {introDone && ready && !autoDismiss ? (
           <button className="btn btn--primary btn--lg cine__cta" onClick={leave}>
-            Get Started <span aria-hidden="true">→</span>
+            {t(_splashLang(), 'splash.getStarted')} <span aria-hidden="true">→</span>
           </button>
         ) : introDone ? (
-          <div className="cine__wait" aria-label="Loading">
+          <div className="cine__wait" aria-label={t(_splashLang(), 'app.loading')}>
             <span /><span /><span />
           </div>
         ) : null}

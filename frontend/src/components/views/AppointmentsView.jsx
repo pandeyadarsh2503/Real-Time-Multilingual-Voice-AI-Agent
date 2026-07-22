@@ -22,9 +22,11 @@ export default function AppointmentsView({ patientName, onNewBooking, onReschedu
   const [phoneOverride, setPhoneOverride] = useState('');
   const [showDocDropdown, setShowDocDropdown] = useState(false);
   const [docSearch, setDocSearch] = useState('');
+  const [loadError, setLoadError] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
+      setLoadError(false);
       const res = await appointmentsAPI.list();
       setAppointments(res.data);
       const remRes = await outboundAPI.upcomingReminders();
@@ -33,6 +35,7 @@ export default function AppointmentsView({ patientName, onNewBooking, onReschedu
       setDoctorsList(docsRes.data);
     } catch (err) {
       console.error('Failed to load appointments/reminders', err);
+      setLoadError(true);
       toast.error(t(language, 'toast.loadAppointments'));
     }
   }, []);
@@ -63,7 +66,7 @@ export default function AppointmentsView({ patientName, onNewBooking, onReschedu
     }
     setReminderLoading(true);
     try {
-      const res = await outboundAPI.triggerDemo({
+      await outboundAPI.triggerDemo({
         phone,
         patient_name: patientName,
         doctor: reminderDoctor,
@@ -307,12 +310,20 @@ export default function AppointmentsView({ patientName, onNewBooking, onReschedu
             >
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <h4 style={{ margin: 0 }}>{appt.doctor}</h4>
-                <span className={`status-tag ${appt.status}`}>{appt.status}</span>
+                <span className={`status-tag ${appt.status}`}>{t(language, `status.${appt.status}`)}</span>
               </div>
               <div style={{ fontSize: '0.85rem', color: '#64748b', marginTop: '5px' }}>{appt.date} • {appt.time}</div>
             </div>
           ))}
-          {activeAppointments.length === 0 && (
+          {activeAppointments.length === 0 && loadError && (
+            <div style={{ color: '#64748b', fontSize: '0.9rem', padding: '10px' }}>
+              {t(language, 'state.loadError')}{' '}
+              <button onClick={loadData} style={{ background: 'none', border: 'none', color: '#2563eb', fontWeight: 600, cursor: 'pointer' }}>
+                {t(language, 'state.retry')}
+              </button>
+            </div>
+          )}
+          {activeAppointments.length === 0 && !loadError && (
             <div style={{ color: '#64748b', fontSize: '0.9rem', padding: '10px' }}>{t(language, 'appts.none')}</div>
           )}
 
