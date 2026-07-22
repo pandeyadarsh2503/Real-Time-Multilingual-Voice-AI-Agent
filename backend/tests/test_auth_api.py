@@ -162,6 +162,19 @@ def test_outbound_call_and_staff_endpoints_reject_patients(client):
                        json={"appointment_id": "RAVI0001", "response": "confirm"}).status_code == 200
 
 
+def test_trigger_demo_success_path_does_not_500(client):
+    """Regression: @limiter.limit on trigger-demo needs a `response: Response`
+    param, or a SUCCESSFUL call 500s when slowapi injects rate-limit headers."""
+    login_as(PATIENT_ASHA)
+    resp = client.post("/api/outbound/trigger-demo", json={
+        "phone": "+919876543210", "patient_name": "Asha", "doctor": "Dr Ananya Iyer",
+        "date": FUTURE, "time": "10:00", "delay_minutes": 5,
+    })
+    assert resp.status_code == 200, resp.text
+    assert resp.json().get("success") is True
+    assert "x-ratelimit-limit" in {k.lower() for k in resp.headers}
+
+
 def test_upcoming_reminders_scoped_to_caller(client):
     """A patient sees only their own tomorrow appointments; the full
     roster is doctor/admin only (was a plaintext PHI dump to any caller)."""

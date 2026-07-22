@@ -2,7 +2,7 @@ import hmac
 import logging
 from datetime import timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
@@ -66,7 +66,7 @@ class PatientResponseRequest(BaseModel):
 # ── Live Exotel call (clinic staff only) ───────────────────
 @router.post("/outbound/trigger", dependencies=[Depends(require_role(ROLE_DOCTOR))])
 @limiter.limit("10/minute")
-async def trigger_call(request: Request, req: TriggerRequest, db: Session = Depends(get_db)):
+async def trigger_call(request: Request, response: Response, req: TriggerRequest, db: Session = Depends(get_db)):
     appt = db.query(Appointment).filter(
         Appointment.id == req.appointment_id,
         Appointment.status.in_(BLOCKING_STATUSES),
@@ -275,7 +275,7 @@ class TriggerDemoRequest(BaseModel):
 
 @router.post("/outbound/trigger-demo", dependencies=[Depends(get_current_user)])
 @limiter.limit("3/hour")
-async def trigger_demo_call(request: Request, req: TriggerDemoRequest):
+async def trigger_demo_call(request: Request, response: Response, req: TriggerDemoRequest):
     """
     Schedule a reminder call to the caller's own number after `delay_minutes`.
 
