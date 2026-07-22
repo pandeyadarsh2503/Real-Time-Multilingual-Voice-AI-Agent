@@ -4,9 +4,11 @@ from datetime import timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from config import clinic_today, settings
+from core.rate_limit import limiter
 from database.database import get_db
 from database.models import (
     BLOCKING_STATUSES,
@@ -15,7 +17,12 @@ from database.models import (
     Appointment,
     OutboundCampaign,
 )
-from services.auth_service import get_current_user
+from services.auth_service import (
+    ROLE_DOCTOR,
+    ROLE_PATIENT,
+    get_current_user,
+    require_role,
+)
 from services.exotel_service import initiate_reminder_call
 from services.llm_service import generate_outbound_message
 from services.scheduler_service import schedule_reminder
@@ -23,10 +30,19 @@ from services.scheduler_service import schedule_reminder
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
+# A phone number the telephony layer will actually dial. Shape-validated
+# (not identity-validated) — the real abuse guard is the role gate + rate
+# limit on the routes that use it.
+_PHONE = Field(..., min_length=8, max_length=16, pattern=r"^\+?[0-9 ]+$")
+
+
+def _own_name(user: dict) -> str:
+    return user.get("name") or user.get("email") or ""
+
 
 class TriggerRequest(BaseModel):
     appointment_id: str
-    phone: str
+    phone: str = _PHONE
 
 
 class SimulateRequest(BaseModel):
@@ -47,9 +63,10 @@ class PatientResponseRequest(BaseModel):
     response: str         # "confirm" | "reschedule" | "no"
 
 
-# ── Live Exotel call ───────────────────────────────────────
-@router.post("/outbound/trigger", dependencies=[Depends(get_current_user)])
-async def trigger_call(req: TriggerRequest, db: Session = Depends(get_db)):
+# ── Live Exotel call (clinic staff only) ───────────────────
+@router.post("/outbound/trigger", dependencies=[Depends(require_role(ROLE_DOCTOR))])
+@limiter.limit("10/minute")
+async def trigger_call(request: Request, req: TriggerRequest, db: Session = Depends(get_db)):
     appt = db.query(Appointment).filter(
         Appointment.id == req.appointment_id,
         Appointment.status.in_(BLOCKING_STATUSES),
@@ -76,8 +93,8 @@ async def trigger_call(req: TriggerRequest, db: Session = Depends(get_db)):
     return result
 
 
-# ── Simulation mode (no Exotel needed) ────────────────────
-@router.post("/outbound/simulate", dependencies=[Depends(get_current_user)])
+# ── Simulation mode (no Exotel needed) — clinic staff only ─
+@router.post("/outbound/simulate", dependencies=[Depends(require_role(ROLE_DOCTOR))])
 async def simulate_reminder(req: SimulateRequest, db: Session = Depends(get_db)):
     """Returns the reminder payload the AI would speak — for demo/testing."""
     appt = db.query(Appointment).filter(Appointment.id == req.appointment_id).first()
@@ -150,15 +167,27 @@ async def exotel_webhook(request: Request, db: Session = Depends(get_db)):
 
 
 # ── Upcoming reminder list ─────────────────────────────────
-@router.get("/outbound/upcoming-reminders", dependencies=[Depends(get_current_user)])
-def upcoming_reminders(db: Session = Depends(get_db)):
-    """Returns tomorrow's appointments — candidates for reminder calls."""
+@router.get("/outbound/upcoming-reminders")
+def upcoming_reminders(
+    db: Session = Depends(get_db),
+    user: dict = Depends(get_current_user),
+):
+    """Tomorrow's appointments — reminder candidates.
+
+    A patient sees only their OWN tomorrow appointments; doctors/admins
+    see the full roster. Without this scoping the endpoint would leak every
+    patient's name+doctor to any authenticated caller (PHI/IDOR).
+    """
     tomorrow = (clinic_today() + timedelta(days=1)).strftime("%Y-%m-%d")
-    rows = (
-        db.query(Appointment)
-        .filter(Appointment.date == tomorrow, Appointment.status.in_(BLOCKING_STATUSES))
-        .all()
+    q = db.query(Appointment).filter(
+        Appointment.date == tomorrow, Appointment.status.in_(BLOCKING_STATUSES)
     )
+    if user["role"] == ROLE_PATIENT:
+        q = q.filter(or_(
+            Appointment.patient_uid == user["uid"],
+            Appointment.patient_uid.is_(None) & (Appointment.patient_name == _own_name(user)),
+        ))
+    rows = q.all()
     return [
         {
             "appointment_id": a.id,
@@ -171,8 +200,8 @@ def upcoming_reminders(db: Session = Depends(get_db)):
     ]
 
 
-# ── AI-generated outbound message ───────────────────────────
-@router.post("/outbound/generate-message", dependencies=[Depends(get_current_user)])
+# ── AI-generated outbound message — clinic staff only ───────
+@router.post("/outbound/generate-message", dependencies=[Depends(require_role(ROLE_DOCTOR))])
 async def generate_message(req: GenerateMessageRequest):
     """
     Use the LLM to generate a short, multilingual spoken message
@@ -193,8 +222,8 @@ async def generate_message(req: GenerateMessageRequest):
     }
 
 
-# ── Handle patient call response ────────────────────────────
-@router.post("/outbound/respond", dependencies=[Depends(get_current_user)])
+# ── Handle patient call response (clinic staff / IVR only) ──
+@router.post("/outbound/respond", dependencies=[Depends(require_role(ROLE_DOCTOR))])
 async def handle_patient_response(
     req: PatientResponseRequest,
     db: Session = Depends(get_db),
@@ -245,9 +274,15 @@ class TriggerDemoRequest(BaseModel):
 
 
 @router.post("/outbound/trigger-demo", dependencies=[Depends(get_current_user)])
-async def trigger_demo_call(req: TriggerDemoRequest):
+@limiter.limit("3/hour")
+async def trigger_demo_call(request: Request, req: TriggerDemoRequest):
     """
-    Schedule a reminder call after `delay_minutes`.
+    Schedule a reminder call to the caller's own number after `delay_minutes`.
+
+    Patient-accessible (the "call me" reminder widget), so it is rate-limited
+    to 3/hour per client to bound the cost/abuse surface — a call-initiating
+    endpoint must never sit under the loose global default. `phone` is
+    shape-validated on TriggerDemoRequest.
 
     Durable (Temporal workflow with retries and a persisted timer) when
     TEMPORAL_ADDRESS is configured; otherwise falls back to an

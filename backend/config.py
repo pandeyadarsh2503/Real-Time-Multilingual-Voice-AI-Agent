@@ -34,11 +34,17 @@ class Settings(BaseSettings):
     TEMPORAL_TASK_QUEUE: str = "swasthya-reminders"
 
     # ── Auth & security ───────────────────────────────────
+    ENVIRONMENT: str = "development"     # "production" hides /docs & /openapi.json
     FIREBASE_PROJECT_ID: str = ""
     AUTH_DISABLED: bool = False          # dev/CI escape hatch — never enable in production
     ALLOWED_ORIGINS: str = "http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000"
+    MAX_REQUEST_BYTES: int = 262_144     # 256 KB cap on request bodies (JSON/form routes)
     EXOTEL_WEBHOOK_TOKEN: str = ""       # shared secret appended to the webhook URL
     EXOTEL_STATUS_CALLBACK_URL: str = "" # public URL Exotel posts call status to
+
+    @property
+    def is_production(self) -> bool:
+        return self.ENVIRONMENT.strip().lower() in ("production", "prod")
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

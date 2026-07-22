@@ -77,10 +77,13 @@ def build_tool_executor(db: Session, user: dict, patient_name: str | None, lang:
         if tool_name == "reschedule_appointment":
             return reschedule_appointment(
                 args["appointment_id"], args["new_date"], args["new_time"], db,
-                patient_uid=user["uid"],
+                patient_uid=user["uid"], patient_name=patient_name,
             )
 
-        return cancel_appointment(args["appointment_id"], db, patient_uid=user["uid"])
+        return cancel_appointment(
+            args["appointment_id"], db,
+            patient_uid=user["uid"], patient_name=patient_name,
+        )
 
     return tool_executor
 

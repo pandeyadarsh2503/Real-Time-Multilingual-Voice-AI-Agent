@@ -50,6 +50,7 @@ def list_appointments(
     patient_name: Optional[str] = None,
     date_filter: Optional[str] = None,
     status: Optional[str] = None,
+    limit: int = Query(200, ge=1, le=500),
     db: Session = Depends(get_db),
     user: dict = Depends(get_current_user),
 ):
@@ -66,7 +67,7 @@ def list_appointments(
         q = q.filter(Appointment.date == date_filter)
     if status:
         q = q.filter(Appointment.status == status)
-    return q.order_by(Appointment.date, Appointment.time).all()
+    return q.order_by(Appointment.date, Appointment.time).limit(limit).all()
 
 
 @router.get("/appointments/today", dependencies=[Depends(require_role(ROLE_DOCTOR))])

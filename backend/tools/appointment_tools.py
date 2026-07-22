@@ -41,15 +41,25 @@ def _suggest_slots(doctor: str, date_str: str, db: Session, limit: int = 3) -> l
     return avail.get("available_slots", [])[:limit]
 
 
-def _owned_filter(query, patient_uid: Optional[str]):
-    """Restrict to the caller's appointments. Legacy rows without a uid
-    stay reachable (they predate authentication and can't be verified)."""
-    if patient_uid:
-        query = query.filter(or_(
-            Appointment.patient_uid == patient_uid,
-            Appointment.patient_uid.is_(None),
-        ))
-    return query
+def _owned_filter(query, patient_uid: Optional[str], patient_name: Optional[str] = None):
+    """Restrict to the caller's appointments.
+
+    A row is owned if its uid matches the caller, OR it is a legacy row
+    (no uid, booked before auth existed) whose patient_name matches the
+    caller's name. The name gate is essential: without it, ANY caller
+    could act on ANY uid-less appointment by supplying its id. Mirrors
+    routers/appointments._owned_by and list_my_appointments exactly.
+
+    When patient_uid is falsy (AUTH_DISABLED / dev), no scoping is applied.
+    """
+    if not patient_uid:
+        return query
+    ownership = [Appointment.patient_uid == patient_uid]
+    if patient_name:
+        ownership.append(
+            Appointment.patient_uid.is_(None) & (Appointment.patient_name == patient_name)
+        )
+    return query.filter(or_(*ownership))
 
 
 def check_availability(doctor: str, date_str: str, db: Session) -> dict:
@@ -63,6 +73,7 @@ def check_availability(doctor: str, date_str: str, db: Session) -> dict:
     appt_date = _parse_date(date_str)
     if appt_date is None:
         return {"error": "Invalid date format. Please use YYYY-MM-DD."}
+    date_str = appt_date.isoformat()   # canonicalise (2026-7-5 → 2026-07-05)
 
     if appt_date < clinic_today():
         return {"error": "Cannot check availability for past dates."}
@@ -104,6 +115,7 @@ def book_appointment(
     appt_date = _parse_date(date_str)
     if appt_date is None:
         return {"error": "Invalid date format. Use YYYY-MM-DD."}
+    date_str = appt_date.isoformat()   # canonicalise so the unique index & conflict query agree
 
     if appt_date < clinic_today():
         return {"error": "Cannot book appointments in the past."}
@@ -216,6 +228,7 @@ def reschedule_appointment(
     new_time: str,
     db: Session,
     patient_uid: Optional[str] = None,
+    patient_name: Optional[str] = None,
 ) -> dict:
     """Move an existing active appointment to a new slot."""
     appt = _owned_filter(
@@ -224,6 +237,7 @@ def reschedule_appointment(
             Appointment.status.in_(BLOCKING_STATUSES),
         ),
         patient_uid,
+        patient_name,
     ).first()
 
     if not appt:
@@ -232,6 +246,7 @@ def reschedule_appointment(
     new_date_obj = _parse_date(new_date)
     if new_date_obj is None:
         return {"error": "Invalid date format. Use YYYY-MM-DD."}
+    new_date = new_date_obj.isoformat()   # canonicalise
 
     if new_date_obj < clinic_today():
         return {"error": "Cannot reschedule to a past date."}
@@ -287,15 +302,21 @@ def reschedule_appointment(
     }
 
 
-def cancel_appointment(appointment_id: str, db: Session, patient_uid: Optional[str] = None) -> dict:
+def cancel_appointment(
+    appointment_id: str,
+    db: Session,
+    patient_uid: Optional[str] = None,
+    patient_name: Optional[str] = None,
+) -> dict:
     """Cancel an active appointment. When patient_uid is given, only that
-    patient's own (or legacy unowned) appointments can be cancelled."""
+    patient's own (or legacy name-matched) appointments can be cancelled."""
     appt = _owned_filter(
         db.query(Appointment).filter(
             Appointment.id == appointment_id,
             Appointment.status.in_(BLOCKING_STATUSES),
         ),
         patient_uid,
+        patient_name,
     ).first()
 
     if not appt:

@@ -1,3 +1,4 @@
+import hmac
 import json
 import logging
 import time
@@ -5,6 +6,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from prometheus_fastapi_instrumentator import Instrumentator
 from slowapi import _rate_limit_exceeded_handler
@@ -53,6 +55,10 @@ async def lifespan(app: FastAPI):
     logger.info("🛑 Server shutting down.")
 
 
+# In production, don't publish the interactive docs / OpenAPI schema —
+# they map the entire API surface for an attacker. Enabled in dev/staging.
+_docs_on = not settings.is_production
+
 app = FastAPI(
     title="SwasthyaAI — Healthcare Voice Assistant",
     description=(
@@ -61,7 +67,30 @@ app = FastAPI(
     ),
     version="1.0.0",
     lifespan=lifespan,
+    docs_url="/docs" if _docs_on else None,
+    redoc_url="/redoc" if _docs_on else None,
+    openapi_url="/openapi.json" if _docs_on else None,
 )
+
+# Paths allowed to send large (audio) bodies; everything else is capped
+# so an unauthenticated client can't push a multi-MB body the server
+# buffers before auth/validation rejects it.
+_LARGE_BODY_PATHS = ("/api/voice/stt",)
+_MAX_AUDIO_BYTES = 12 * 1024 * 1024
+
+
+@app.middleware("http")
+async def limit_body_size(request: Request, call_next):
+    cl = request.headers.get("content-length")
+    if cl is not None:
+        try:
+            size = int(cl)
+        except ValueError:
+            size = 0
+        limit = _MAX_AUDIO_BYTES if request.url.path in _LARGE_BODY_PATHS else settings.MAX_REQUEST_BYTES
+        if size > limit:
+            return JSONResponse(status_code=413, content={"detail": "Request body too large."})
+    return await call_next(request)
 
 # ── Rate limiting (Redis-backed when configured) ───────────
 app.state.limiter = limiter
@@ -184,6 +213,6 @@ def metrics(request: Request):
     """Prometheus scrape target. Optionally protected by METRICS_TOKEN."""
     if settings.METRICS_TOKEN:
         auth = request.headers.get("Authorization", "")
-        if auth != f"Bearer {settings.METRICS_TOKEN}":
+        if not hmac.compare_digest(auth, f"Bearer {settings.METRICS_TOKEN}"):
             return Response(status_code=403)
     return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)

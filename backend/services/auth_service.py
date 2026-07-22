@@ -68,8 +68,17 @@ def verify_firebase_token(token: str) -> dict:
         raise HTTPException(status_code=503, detail="Authentication is not configured.")
 
     try:
-        kid = jwt.get_unverified_header(token).get("kid")
         certs = _get_certs()
+    except requests.RequestException as exc:
+        # Google's cert endpoint is unreachable — our dependency is down,
+        # not the caller's token. 503 so clients retry instead of logging out.
+        logger.error(f"Could not fetch Google signing certs: {exc}")
+        raise HTTPException(
+            status_code=503, detail="Authentication service temporarily unavailable."
+        ) from exc
+
+    try:
+        kid = jwt.get_unverified_header(token).get("kid")
         if kid not in certs:
             raise jwt.InvalidTokenError("Unknown key id")
         public_key = load_pem_x509_certificate(certs[kid].encode()).public_key()

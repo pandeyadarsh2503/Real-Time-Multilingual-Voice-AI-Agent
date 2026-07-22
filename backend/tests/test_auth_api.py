@@ -24,6 +24,7 @@ from main import app
 from services.auth_service import get_current_user
 
 FUTURE = (clinic_today() + timedelta(days=5)).strftime("%Y-%m-%d")
+TOMORROW = (clinic_today() + timedelta(days=1)).strftime("%Y-%m-%d")
 
 PATIENT_ASHA = {"uid": "uid-asha", "name": "Asha", "email": "asha@x.com", "role": "patient"}
 PATIENT_RAVI = {"uid": "uid-ravi", "name": "Ravi", "email": "ravi@x.com", "role": "patient"}
@@ -58,6 +59,11 @@ def client():
         # uid-linked row booked under a different display name — uid wins.
         Appointment(id="ASHA0002", patient_uid="uid-asha", patient_name="A. Sharma",
                     doctor="Dr Ananya Iyer", date=FUTURE, time="11:00", status="scheduled"),
+        # Tomorrow rows — reminder-candidate scoping.
+        Appointment(id="ASHATOM1", patient_uid="uid-asha", patient_name="Asha",
+                    doctor="Dr Ananya Iyer", date=TOMORROW, time="09:00", status="scheduled"),
+        Appointment(id="RAVITOM1", patient_uid="uid-ravi", patient_name="Ravi",
+                    doctor="Dr Ananya Iyer", date=TOMORROW, time="09:30", status="scheduled"),
     ])
     seed.commit()
     seed.close()
@@ -87,12 +93,12 @@ def test_health_endpoints_are_public(client):
 def test_patient_sees_only_own_appointments(client):
     login_as(PATIENT_ASHA)
     rows = client.get("/api/appointments").json()
-    # Legacy row matched by name + uid-linked row matched by uid.
-    assert {r["id"] for r in rows} == {"ASHA0001", "ASHA0002"}
+    # Legacy row matched by name + uid-linked rows matched by uid.
+    assert {r["id"] for r in rows} == {"ASHA0001", "ASHA0002", "ASHATOM1"}
 
     # filter injection attempt is ignored for patients
     rows = client.get("/api/appointments", params={"patient_name": "Ravi"}).json()
-    assert {r["id"] for r in rows} == {"ASHA0001", "ASHA0002"}
+    assert {r["id"] for r in rows} == {"ASHA0001", "ASHA0002", "ASHATOM1"}
 
 
 def test_uid_ownership_beats_name(client):
@@ -109,7 +115,7 @@ def test_uid_ownership_beats_name(client):
 def test_doctor_sees_all_appointments(client):
     login_as(DOCTOR_USER)
     rows = client.get("/api/appointments").json()
-    assert {r["id"] for r in rows} == {"ASHA0001", "RAVI0001", "ASHA0002"}
+    assert {r["id"] for r in rows} == {"ASHA0001", "RAVI0001", "ASHA0002", "ASHATOM1", "RAVITOM1"}
 
 
 def test_patient_cannot_cancel_someone_elses_appointment(client):
@@ -134,6 +140,37 @@ def test_today_view_requires_doctor_role(client):
 def test_webhook_requires_shared_token(client):
     resp = client.post("/api/outbound/webhook", data={"CallSid": "x"})
     assert resp.status_code == 403
+
+
+def test_outbound_call_and_staff_endpoints_reject_patients(client):
+    """A patient must not reach the call-initiating or cross-patient
+    staff endpoints on the outbound router (toll-fraud / IDOR guard)."""
+    login_as(PATIENT_ASHA)
+    assert client.post("/api/outbound/trigger",
+                       json={"appointment_id": "ASHA0001", "phone": "+919876543210"}).status_code == 403
+    assert client.post("/api/outbound/simulate",
+                       json={"appointment_id": "RAVI0001"}).status_code == 403
+    assert client.post("/api/outbound/generate-message",
+                       json={"name": "Asha", "doctor": "Dr Ananya Iyer", "date": FUTURE,
+                             "time": "10:00", "purpose": "reminder"}).status_code == 403
+    # The IDOR that used to let any patient confirm any appointment.
+    assert client.post("/api/outbound/respond",
+                       json={"appointment_id": "RAVI0001", "response": "confirm"}).status_code == 403
+    # Doctor/admin reaches the same route (no network on this branch).
+    login_as(DOCTOR_USER)
+    assert client.post("/api/outbound/respond",
+                       json={"appointment_id": "RAVI0001", "response": "confirm"}).status_code == 200
+
+
+def test_upcoming_reminders_scoped_to_caller(client):
+    """A patient sees only their own tomorrow appointments; the full
+    roster is doctor/admin only (was a plaintext PHI dump to any caller)."""
+    login_as(PATIENT_ASHA)
+    ids = {r["appointment_id"] for r in client.get("/api/outbound/upcoming-reminders").json()}
+    assert ids == {"ASHATOM1"}
+    login_as(DOCTOR_USER)
+    ids = {r["appointment_id"] for r in client.get("/api/outbound/upcoming-reminders").json()}
+    assert {"ASHATOM1", "RAVITOM1"} <= ids
 
 
 def test_authorized_chat_success_path_with_rate_limit_headers(client, monkeypatch):

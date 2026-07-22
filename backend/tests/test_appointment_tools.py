@@ -180,3 +180,34 @@ def test_reschedule_respects_ownership(db):
     assert "error" in stolen
     moved = reschedule_appointment(a["appointment_id"], FUTURE2, "11:00", db, patient_uid="uid-asha")
     assert moved["success"]
+
+
+def test_legacy_uidless_row_not_cancellable_by_other_user(db):
+    """Audit H1: a NULL-uid (legacy) appointment must not be cancellable
+    by a caller whose name doesn't match — the NULL branch needs the name
+    gate, otherwise it's a cross-patient IDOR."""
+    a = book_appointment("Asha", DOCTOR, FUTURE, "10:00", db)  # no uid → legacy row
+    # Mallory (different uid AND different name) must not touch it.
+    assert "error" in cancel_appointment(a["appointment_id"], db,
+                                         patient_uid="uid-mallory", patient_name="Mallory")
+    assert "error" in reschedule_appointment(a["appointment_id"], FUTURE2, "11:00", db,
+                                             patient_uid="uid-mallory", patient_name="Mallory")
+    # Asha (name matches the legacy row) still can.
+    assert cancel_appointment(a["appointment_id"], db,
+                              patient_uid="uid-asha", patient_name="Asha")["success"]
+
+
+def test_non_canonical_date_still_double_books(db):
+    """Audit H2: '2026-7-5' and '2026-07-05' are the same day and must
+    collide, not both succeed as distinct string rows."""
+    import datetime as _dt
+    d = clinic_today() + _dt.timedelta(days=10)
+    padded = d.isoformat()                       # 2026-07-05
+    unpadded = f"{d.year}-{d.month}-{d.day}"     # 2026-7-5
+    first = book_appointment("Asha", DOCTOR, unpadded, "10:00", db)
+    assert first["success"] is True
+    assert first["date"] == padded               # stored canonical
+    clash = book_appointment("Ravi", DOCTOR, padded, "10:00", db)
+    assert "error" in clash
+    # And check_availability agrees regardless of which form is asked.
+    assert "10:00" not in check_availability(DOCTOR, unpadded, db)["available_slots"]
