@@ -109,7 +109,9 @@ def test_long_history_compressed_with_summary_head():
     msgs = _long_history(40)
     out = run(ms.compress_session_messages(msgs, fake_summarizer))
     assert len(out) < len(msgs)
-    assert out[0]["role"] == "system"
+    # Summary carried as a user-role context note (not system) so injected
+    # instructions in past turns can't be re-issued with app authority.
+    assert out[0]["role"] == "user"
     assert "summarized" in out[0]["content"]
     # recent turns kept verbatim and start at a user turn
     assert out[1]["role"] == "user"
@@ -179,3 +181,56 @@ def test_redis_store_backs_full_session_api(db):
         assert await ms.get_session("u2:other", db) == []
 
     run(scenario())
+
+
+def test_redis_outage_degrades_gracefully_to_sql(db):
+    """Audit H4: a Redis outage must NOT 500 the turn. get() returns None
+    (so context rebuilds from SQL); set/delete swallow the error."""
+    class BrokenRedis:
+        async def getex(self, *a, **k):
+            raise ConnectionError("redis down")
+        async def setex(self, *a, **k):
+            raise ConnectionError("redis down")
+        async def delete(self, *a, **k):
+            raise ConnectionError("redis down")
+
+    async def scenario():
+        ms.store = ms.RedisSessionStore(client=BrokenRedis())
+        # persisted SQL turns are the durable fallback
+        ms.persist_text("u1:s1", "user", "from sql", db)
+        # set does not raise
+        await ms.store.set("u1:s1", [{"role": "user", "content": "x"}])
+        # get returns None → get_session rebuilds from SQL instead of raising
+        msgs = await ms.get_session("u1:s1", db)
+        assert [m["content"] for m in msgs] == ["from sql"]
+        await ms.store.delete("u1:s1")  # must not raise
+
+    run(scenario())
+
+
+def test_session_trim_never_starts_on_orphan_tool(monkeypatch):
+    """Audit M7: trimming to MAX_SESSION must not leave the window starting
+    on a 'tool' message whose 'tool_calls' parent was sliced off."""
+    monkeypatch.setattr(ms, "MAX_SESSION", 3)
+    msgs = [
+        {"role": "user", "content": "book it"},
+        {"role": "assistant", "content": None, "tool_calls": [{"id": "t1"}]},
+        {"role": "tool", "tool_call_id": "t1", "content": "{}"},
+        {"role": "assistant", "content": "done"},
+    ]
+    trimmed = ms._trim_session(msgs)
+    assert len(trimmed) <= 3
+    assert trimmed[0]["role"] != "tool"
+
+
+def test_patient_memory_no_cross_user_bleed(db):
+    """Audit H3/H5: two distinct users sharing a display name must not
+    overwrite each other's long-term memory (uid is the identity key)."""
+    ms.update_patient_memory("Priya Sharma", {"preferred_doctor": "Dr A", "language": "hi"},
+                             db, uid="uid-1")
+    ms.update_patient_memory("Priya Sharma", {"preferred_doctor": "Dr B", "language": "ta"},
+                             db, uid="uid-2")
+    m1 = ms.get_patient_memory("Priya Sharma", db, uid="uid-1")
+    m2 = ms.get_patient_memory("Priya Sharma", db, uid="uid-2")
+    assert m1["preferred_doctor"] == "Dr A"   # not overwritten by uid-2
+    assert m2["preferred_doctor"] == "Dr B"

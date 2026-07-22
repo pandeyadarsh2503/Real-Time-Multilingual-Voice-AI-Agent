@@ -28,6 +28,16 @@ class Settings(BaseSettings):
     SESSION_TTL_SECONDS: int = 1800      # sliding TTL for live conversations
     MEMORY_RETENTION_DAYS: int = 30      # persisted transcript retention
 
+    # ── Live voice (WebRTC ICE) ───────────────────────────
+    # STUN lets the containerized backend learn its public (server-reflexive)
+    # address; without it aiortc only offers unroutable host candidates and
+    # media never connects for remote/NAT'd users. TURN relays when either
+    # side is behind symmetric NAT / a UDP-blocking firewall.
+    STUN_URL: str = "stun:stun.l.google.com:19302"
+    TURN_URLS: str = ""                  # comma-separated, e.g. turn:turn.example.com:3478
+    TURN_USERNAME: str = ""
+    TURN_CREDENTIAL: str = ""
+
     # ── Temporal (durable workflows) ──────────────────────
     TEMPORAL_ADDRESS: str = ""           # e.g. localhost:7233; empty = in-process fallback
     TEMPORAL_NAMESPACE: str = "default"

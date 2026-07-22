@@ -51,6 +51,9 @@ class Appointment(Base):
         ),
         # Serves check_availability / conflict lookups.
         Index("ix_appt_doctor_date_status", "doctor", "date", "status"),
+        # Serves date-scoped scans (upcoming / today / reminder rosters)
+        # that filter on date without a doctor.
+        Index("ix_appt_date_status", "date", "status"),
     )
 
 
@@ -60,7 +63,10 @@ class Patient(Base):
     id                  = Column(Integer, primary_key=True, autoincrement=True)
     # Firebase uid — the stable identity. Nullable for legacy rows.
     uid                 = Column(String(128), unique=True)
-    name                = Column(String(120), unique=True, nullable=False)
+    # NOT unique: Firebase display names are not unique, so a UNIQUE(name)
+    # made two users with the same name collide onto one row and overwrite
+    # each other's preferred doctor / language (cross-patient PII bleed).
+    name                = Column(String(120), nullable=False, index=True)
     phone               = Column(String(20))
     preferred_doctor    = Column(String(120))
     language            = Column(String(5), default="en")   # en | hi | ta

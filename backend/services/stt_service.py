@@ -5,6 +5,7 @@ Saves audio to a temp file (required for ffmpeg-backed decoding of webm/opus).
 import logging
 import os
 import tempfile
+import threading
 
 from faster_whisper import WhisperModel
 
@@ -13,6 +14,9 @@ from config import WHISPER_MODEL
 logger = logging.getLogger(__name__)
 
 _model: WhisperModel | None = None
+# A single shared model runs across the asyncio threadpool; faster-whisper
+# transcribe() is not safe to call concurrently on one model, so serialize it.
+_model_lock = threading.Lock()
 
 
 def _get_model() -> WhisperModel:
@@ -42,8 +46,9 @@ def transcribe(audio_bytes: bytes, language_hint: str | None = None) -> dict:
             # Whisper uses ISO-639-1 codes
             kwargs["language"] = language_hint
 
-        segments, info = model.transcribe(tmp_path, beam_size=5, **kwargs)
-        text = " ".join(seg.text.strip() for seg in segments).strip()
+        with _model_lock:
+            segments, info = model.transcribe(tmp_path, beam_size=5, **kwargs)
+            text = " ".join(seg.text.strip() for seg in segments).strip()
 
         lang_map = {"hi": "hi", "ta": "ta", "en": "en"}
         detected = lang_map.get(info.language, "en")
@@ -64,10 +69,11 @@ def warm_up():
     _get_model()
 
 
-def transcribe_pcm(pcm_f32, language_hint: str | None = None) -> dict:
+def transcribe_pcm(pcm_f32, language_hint: str | None = None, beam_size: int = 5) -> dict:
     """
     Transcribe a float32 mono 16 kHz numpy array (the live-voice path —
-    no temp files, no container decode).
+    no temp files, no container decode). beam_size=1 (greedy) is used for
+    low-latency partial transcripts; beam_size=5 for the final utterance.
     Returns: { text, language, confidence }
     """
     model = _get_model()
@@ -75,8 +81,9 @@ def transcribe_pcm(pcm_f32, language_hint: str | None = None) -> dict:
     if language_hint and language_hint in ("en", "hi", "ta"):
         kwargs["language"] = language_hint
 
-    segments, info = model.transcribe(pcm_f32, beam_size=5, **kwargs)
-    text = " ".join(seg.text.strip() for seg in segments).strip()
+    with _model_lock:
+        segments, info = model.transcribe(pcm_f32, beam_size=beam_size, **kwargs)
+        text = " ".join(seg.text.strip() for seg in segments).strip()
     detected = info.language if info.language in ("en", "hi", "ta") else "en"
     return {
         "text": text,

@@ -37,26 +37,31 @@ ROLE_ADMIN   = "admin"
 
 _bearer = HTTPBearer(auto_error=False)
 
-# ── Google public-cert cache (refreshed per Cache-Control max-age) ──
+# ── Google public-key cache (refreshed per Cache-Control max-age) ──
+# Cache the PARSED public keys, not the raw PEM — parsing an X.509 cert per
+# request is needless CPU on the hot auth path.
 _certs_lock = threading.Lock()
-_certs: dict[str, str] = {}
+_public_keys: dict = {}
 _certs_expiry: float = 0.0
 
 
-def _get_certs() -> dict[str, str]:
-    global _certs, _certs_expiry
+def _get_public_keys() -> dict:
+    global _public_keys, _certs_expiry
     with _certs_lock:
-        if _certs and time.time() < _certs_expiry:
-            return _certs
+        if _public_keys and time.time() < _certs_expiry:
+            return _public_keys
         resp = requests.get(GOOGLE_CERTS_URL, timeout=10)
         resp.raise_for_status()
-        _certs = resp.json()
+        _public_keys = {
+            kid: load_pem_x509_certificate(pem.encode()).public_key()
+            for kid, pem in resp.json().items()
+        }
         max_age = 3600
         m = re.search(r"max-age=(\d+)", resp.headers.get("Cache-Control", ""))
         if m:
             max_age = int(m.group(1))
         _certs_expiry = time.time() + max_age
-        return _certs
+        return _public_keys
 
 
 def verify_firebase_token(token: str) -> dict:
@@ -68,7 +73,7 @@ def verify_firebase_token(token: str) -> dict:
         raise HTTPException(status_code=503, detail="Authentication is not configured.")
 
     try:
-        certs = _get_certs()
+        keys = _get_public_keys()
     except requests.RequestException as exc:
         # Google's cert endpoint is unreachable — our dependency is down,
         # not the caller's token. 503 so clients retry instead of logging out.
@@ -79,9 +84,9 @@ def verify_firebase_token(token: str) -> dict:
 
     try:
         kid = jwt.get_unverified_header(token).get("kid")
-        if kid not in certs:
+        public_key = keys.get(kid)
+        if public_key is None:
             raise jwt.InvalidTokenError("Unknown key id")
-        public_key = load_pem_x509_certificate(certs[kid].encode()).public_key()
         claims = jwt.decode(
             token,
             key=public_key,

@@ -25,6 +25,7 @@ import logging
 import time
 from typing import Awaitable, Callable, Dict, List, Optional, Tuple
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from config import settings
@@ -43,6 +44,8 @@ KEEP_RECENT    = 10    # turns kept verbatim when compressing
 class InMemorySessionStore:
     """Dev fallback: per-process dict with the same TTL semantics as Redis."""
 
+    MAX_SESSIONS = 5000   # hard cap so a single process can't grow unbounded
+
     def __init__(self):
         self._data: Dict[str, Tuple[float, List[dict]]] = {}
 
@@ -50,6 +53,12 @@ class InMemorySessionStore:
         now = time.monotonic()
         for key in [k for k, (exp, _) in self._data.items() if exp <= now]:
             del self._data[key]
+        # Bound memory even if nothing has expired: evict the soonest-to-expire.
+        if len(self._data) > self.MAX_SESSIONS:
+            for key, _ in sorted(self._data.items(), key=lambda kv: kv[1][0])[
+                : len(self._data) - self.MAX_SESSIONS
+            ]:
+                del self._data[key]
 
     async def get(self, key: str) -> Optional[List[dict]]:
         self._prune()
@@ -69,7 +78,13 @@ class InMemorySessionStore:
 
 
 class RedisSessionStore:
-    """Redis (Upstash) store — async client, JSON values, SETEX TTL."""
+    """Redis (Upstash) store — async client, JSON values, SETEX TTL.
+
+    Every operation degrades gracefully: a Redis outage must never 500 an
+    entire chat/voice turn. On a read failure we return None so the caller
+    rebuilds context from the SQL Memory table; writes/deletes log and
+    continue (SQL stays the durable source of truth via persist_text).
+    """
 
     def __init__(self, url: str = "", client=None):
         if client is not None:      # test injection point
@@ -85,18 +100,28 @@ class RedisSessionStore:
         return f"session:{key}"
 
     async def get(self, key: str) -> Optional[List[dict]]:
-        raw = await self._redis.getex(self._key(key), ex=settings.SESSION_TTL_SECONDS)
-        return json.loads(raw) if raw else None
+        try:
+            raw = await self._redis.getex(self._key(key), ex=settings.SESSION_TTL_SECONDS)
+            return json.loads(raw) if raw else None
+        except Exception:
+            logger.warning("Redis get failed; falling back to SQL restore.", exc_info=True)
+            return None
 
     async def set(self, key: str, messages: List[dict]):
-        await self._redis.setex(
-            self._key(key),
-            settings.SESSION_TTL_SECONDS,
-            json.dumps(messages, ensure_ascii=False),
-        )
+        try:
+            await self._redis.setex(
+                self._key(key),
+                settings.SESSION_TTL_SECONDS,
+                json.dumps(messages, ensure_ascii=False),
+            )
+        except Exception:
+            logger.warning("Redis set failed; session not cached this turn.", exc_info=True)
 
     async def delete(self, key: str):
-        await self._redis.delete(self._key(key))
+        try:
+            await self._redis.delete(self._key(key))
+        except Exception:
+            logger.warning("Redis delete failed.", exc_info=True)
 
 
 def _build_store():
@@ -130,14 +155,28 @@ async def get_session(session_key: str, db: Session) -> List[dict]:
     return messages
 
 
+def _trim_session(messages: List[dict]) -> List[dict]:
+    """Keep at most MAX_SESSION messages, but never let the window BEGIN on
+    an orphaned tool result — a 'tool' message whose matching assistant
+    tool_calls got sliced off makes the next Groq call 400 (and the router
+    turn it into a 500, wedging the conversation)."""
+    if len(messages) <= MAX_SESSION:
+        return messages
+    window = messages[-MAX_SESSION:]
+    start = 0
+    while start < len(window) and window[start].get("role") == "tool":
+        start += 1
+    return window[start:]
+
+
 async def append_to_session(session_key: str, message: dict, db: Session):
     messages = await get_session(session_key, db)
     messages.append(message)
-    await store.set(session_key, messages[-MAX_SESSION:])
+    await store.set(session_key, _trim_session(messages))
 
 
 async def replace_session(session_key: str, messages: List[dict]):
-    await store.set(session_key, messages[-MAX_SESSION:])
+    await store.set(session_key, _trim_session(messages))
 
 
 async def clear_session(session_key: str, db: Session):
@@ -197,8 +236,12 @@ async def compress_session_messages(
         return messages
     if not summary:
         return messages
+    # Carry the summary as a USER-role note, not system. The summary is
+    # derived from user-supplied conversation text; giving it system
+    # authority would let injected instructions inside past turns be
+    # re-issued as if they were app policy.
     return [
-        {"role": "system", "content": f"Summary of the earlier conversation: {summary}"}
+        {"role": "user", "content": f"[Earlier conversation summary, for context only: {summary}]"}
     ] + messages[cut:]
 
 
@@ -206,11 +249,18 @@ async def compress_session_messages(
 # Looked up by Firebase uid when available (the stable identity);
 # name is the fallback for legacy rows created before authentication.
 
-def _find_patient(name: str, db: Session, uid: Optional[str] = None) -> Optional[Patient]:
+def _find_patient(
+    name: str, db: Session, uid: Optional[str] = None, strict_uid: bool = False
+) -> Optional[Patient]:
     if uid:
         p = db.query(Patient).filter(Patient.uid == uid).first()
         if p:
             return p
+        if strict_uid:
+            # Write path: never fall back to a name match when we have a
+            # uid — two users sharing a display name would otherwise
+            # resolve to (and overwrite) each other's row.
+            return None
     return db.query(Patient).filter(Patient.name == name).first()
 
 
@@ -227,7 +277,7 @@ def get_patient_memory(name: str, db: Session, uid: Optional[str] = None) -> Opt
 
 
 def update_patient_memory(name: str, updates: dict, db: Session, uid: Optional[str] = None):
-    p = _find_patient(name, db, uid)
+    p = _find_patient(name, db, uid, strict_uid=True)
     if not p:
         p = Patient(name=name)
         db.add(p)
@@ -236,4 +286,9 @@ def update_patient_memory(name: str, updates: dict, db: Session, uid: Optional[s
     for k, v in updates.items():
         if hasattr(p, k) and v is not None:
             setattr(p, k, v)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        # Concurrent insert for the same uid raced us — the other write won.
+        db.rollback()
+        logger.warning("Patient memory write lost a concurrent insert race (uid=%s).", uid)

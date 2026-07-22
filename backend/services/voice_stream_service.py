@@ -52,6 +52,7 @@ PREROLL_MS          = 300    # audio kept from just before speech onset
 PARTIAL_INTERVAL_MS = 1200   # cadence of partial transcripts
 
 MAX_LIVE_SESSIONS = 4
+MAX_TTS_CHARS = 1000   # matches routers/voice.py — cap spoken reply length
 
 
 def silero_vad(audio_f32: np.ndarray) -> bool:
@@ -215,6 +216,15 @@ class VoiceSession:
         self._turn_lock = asyncio.Lock()
         self._partial_busy = False
         self.closed = False
+        # Hold strong refs to fire-and-forget tasks; without this the event
+        # loop only keeps a weak ref and a turn/utterance can be GC'd mid-flight.
+        self._bg_tasks: set[asyncio.Task] = set()
+
+    def _spawn(self, coro):
+        task = asyncio.create_task(coro)
+        self._bg_tasks.add(task)
+        task.add_done_callback(self._bg_tasks.discard)
+        return task
 
     # ── DataChannel events ────────────────────────────────
     def attach_channel(self, channel):
@@ -247,7 +257,9 @@ class VoiceSession:
                 frame = await track.recv()
                 for out in resampler.resample(frame):
                     pcm = out.to_ndarray().flatten().astype(np.float32) / 32768.0
-                    utterance = self.segmenter.feed(pcm)
+                    # VAD/segmentation is CPU work (Silero) — keep it off the
+                    # event loop so it can't stall the 20ms outbound frame clock.
+                    utterance = await asyncio.to_thread(self.segmenter.feed, pcm)
 
                     if self.segmenter.speech_just_started:
                         if self.outbound.pending_ms > 100:
@@ -257,9 +269,9 @@ class VoiceSession:
                         self.send_event({"type": "state", "value": "listening"})
 
                     if utterance is not None:
-                        asyncio.create_task(self._handle_utterance(utterance))
+                        self._spawn(self._handle_utterance(utterance))
                     elif self.segmenter.partial_due() and not self._partial_busy:
-                        asyncio.create_task(self._emit_partial())
+                        self._spawn(self._emit_partial())
         except Exception as exc:
             if not self.closed:
                 logger.info("Session %s inbound track ended: %s", self.id, exc)
@@ -270,7 +282,10 @@ class VoiceSession:
             snapshot = self.segmenter.utterance_snapshot()
             if len(snapshot) < SAMPLE_RATE // 2:
                 return
-            result = await asyncio.to_thread(transcribe_pcm, snapshot, self.language)
+            # Partials favour latency over accuracy: greedy decode (beam_size=1)
+            # over a trailing window, not full beam-5 over the whole utterance.
+            snapshot = snapshot[-SAMPLE_RATE * 6:]
+            result = await asyncio.to_thread(transcribe_pcm, snapshot, self.language, 1)
             if result["text"]:
                 self.send_event({"type": "partial_transcript", "text": result["text"]})
         except Exception:
@@ -311,10 +326,12 @@ class VoiceSession:
                 self.send_event({"type": "agent_response", "text": reply, "language": lang})
                 self.send_event({"type": "state", "value": "speaking"})
 
-                audio = await asyncio.to_thread(synthesize_pcm, reply, lang)
+                # Cap synthesis length so a runaway/injected long reply can't
+                # rack up Azure cost or block the turn for tens of seconds.
+                audio = await asyncio.to_thread(synthesize_pcm, reply[:MAX_TTS_CHARS], lang)
                 self.outbound.write(audio)
                 duration = len(audio) / (SAMPLE_RATE * BYTES_PER_SAMPLE)
-                asyncio.create_task(self._back_to_listening(duration))
+                self._spawn(self._back_to_listening(duration))
             except Exception:
                 logger.exception("Voice turn failed (session %s)", self.id)
                 self.send_event({"type": "error", "message": "Sorry, something went wrong. Please try again."})

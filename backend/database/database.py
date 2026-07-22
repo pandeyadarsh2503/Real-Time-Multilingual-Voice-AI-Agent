@@ -1,7 +1,7 @@
 import logging
 from pathlib import Path
 
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import declarative_base, sessionmaker
 
 from config import settings
@@ -15,6 +15,14 @@ if _is_sqlite:
         settings.DATABASE_URL,
         connect_args={"check_same_thread": False},
     )
+
+    @event.listens_for(engine, "connect")
+    def _sqlite_enable_foreign_keys(dbapi_conn, _record):
+        # SQLite ships with FK enforcement OFF per-connection; turn it on so
+        # ForeignKey declarations (outbound_campaigns → appointments) are real.
+        cur = dbapi_conn.cursor()
+        cur.execute("PRAGMA foreign_keys=ON")
+        cur.close()
 else:
     # PostgreSQL (Neon). pool_pre_ping revalidates connections that the
     # serverless proxy may have closed; modest pool sizes stay well
@@ -45,6 +53,18 @@ def get_db():
 #             truth); we upgrade to head on startup.
 # SQLite:     dev-only. create_all plus the idempotent fixups below,
 #             because create_all never alters existing tables.
+
+def _sqlite_unique_name_index(conn) -> bool:
+    """True if the patients table still has a single-column UNIQUE index on
+    `name` (the legacy constraint we now drop)."""
+    for idx in conn.execute(text("PRAGMA index_list(patients)")):
+        # row: (seq, name, unique, origin, partial)
+        if idx[2]:  # unique
+            cols = [r[2] for r in conn.execute(text(f"PRAGMA index_info('{idx[1]}')"))]
+            if cols == ["name"]:
+                return True
+    return False
+
 
 def _sqlite_fixups(conn):
     tables = {
@@ -85,6 +105,10 @@ def _sqlite_fixups(conn):
             "CREATE INDEX IF NOT EXISTS ix_appt_doctor_date_status "
             "ON appointments (doctor, date, status)"
         ))
+        conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_appt_date_status "
+            "ON appointments (date, status)"
+        ))
 
     if "patients" in tables:
         cols = {r[1] for r in conn.execute(text("PRAGMA table_info(patients)"))}
@@ -93,6 +117,21 @@ def _sqlite_fixups(conn):
             conn.execute(text(
                 "CREATE UNIQUE INDEX IF NOT EXISTS uq_patients_uid ON patients (uid)"
             ))
+        # Drop the legacy UNIQUE(name): SQLite can't ALTER a constraint, so
+        # rebuild the table from the current model (no unique on name) when a
+        # single-column unique index on `name` still exists.
+        if _sqlite_unique_name_index(conn):
+            from database import models
+            logger.info("Migrating patients table: dropping legacy UNIQUE(name) …")
+            conn.execute(text("ALTER TABLE patients RENAME TO patients_legacy"))
+            models.Patient.__table__.create(conn)
+            conn.execute(text(
+                "INSERT INTO patients (id, uid, name, phone, preferred_doctor, "
+                "language, last_appointment_id, created_at) "
+                "SELECT id, uid, name, phone, preferred_doctor, language, "
+                "last_appointment_id, created_at FROM patients_legacy"
+            ))
+            conn.execute(text("DROP TABLE patients_legacy"))
 
     if "memory" in tables:
         conn.execute(text(

@@ -50,9 +50,32 @@ async def lifespan(app: FastAPI):
 
     from services.stt_service import warm_up
     _asyncio.get_event_loop().run_in_executor(None, warm_up)
+
+    # Enforce transcript retention continuously, not just at boot — a
+    # long-lived process would otherwise keep PHI past the retention window.
+    prune_task = _asyncio.create_task(_periodic_prune())
     yield
     # ── Shutdown ───────────────────────────────────────────
+    prune_task.cancel()
     logger.info("🛑 Server shutting down.")
+
+
+async def _periodic_prune():
+    import asyncio as _asyncio
+
+    from database.database import SessionLocal
+    from services.memory_service import prune_old_memory
+    while True:
+        try:
+            await _asyncio.sleep(24 * 3600)
+            with SessionLocal() as db:
+                deleted = prune_old_memory(db)
+            if deleted:
+                logger.info(f"🧹 Periodic prune removed {deleted} expired memory rows.")
+        except _asyncio.CancelledError:
+            break
+        except Exception:
+            logger.exception("Periodic memory prune failed (non-fatal).")
 
 
 # In production, don't publish the interactive docs / OpenAPI schema —
