@@ -1,0 +1,17 @@
+# Caddy auto-provisions and renews a Let's Encrypt TLS cert for {$DOMAIN}
+# as long as DNS for that name points at this host and ports 80/443 are open.
+# It reverse-proxies everything to the frontend nginx, which serves the SPA
+# and itself proxies /api → backend.
+
+{$DOMAIN} {
+	encode gzip zstd
+
+	reverse_proxy frontend:80
+
+	header {
+		# Backstop security headers (nginx also sets these on the SPA).
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		-Server
+	}
+}

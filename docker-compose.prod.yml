@@ -1,0 +1,126 @@
+# ─────────────────────────────────────────────────────────────
+# Production stack — single-host deployment.
+#
+#   cp .env.prod.example .env      # then fill it in
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# What runs:
+#   caddy      — TLS termination + reverse proxy (auto HTTPS via Let's Encrypt)
+#   frontend   — static SPA (nginx), also proxies /api → backend
+#   backend    — FastAPI (uvicorn, non-root), migrates Postgres on boot
+#   postgres   — app database (or point DATABASE_URL at Neon and drop this)
+#   redis      — sessions + rate limiting (or point REDIS_URL at Upstash and drop this)
+#   coturn     — TURN relay for live WebRTC voice  (profile: turn)
+#
+# Managed alternative: delete the postgres/redis services and set
+# DATABASE_URL=<Neon> / REDIS_URL=<Upstash> in .env. See DEPLOYMENT.md.
+# ─────────────────────────────────────────────────────────────
+services:
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN in .env}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - frontend
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_FIREBASE_API_KEY: ${VITE_FIREBASE_API_KEY:?}
+        VITE_FIREBASE_AUTH_DOMAIN: ${VITE_FIREBASE_AUTH_DOMAIN:?}
+        VITE_FIREBASE_PROJECT_ID: ${VITE_FIREBASE_PROJECT_ID:?}
+        VITE_FIREBASE_STORAGE_BUCKET: ${VITE_FIREBASE_STORAGE_BUCKET:?}
+        VITE_FIREBASE_MESSAGING_SENDER_ID: ${VITE_FIREBASE_MESSAGING_SENDER_ID:?}
+        VITE_FIREBASE_APP_ID: ${VITE_FIREBASE_APP_ID:?}
+        VITE_STUN_URL: ${VITE_STUN_URL:-stun:stun.l.google.com:19302}
+        VITE_TURN_URLS: ${VITE_TURN_URLS:-}
+        VITE_TURN_USERNAME: ${VITE_TURN_USERNAME:-}
+        VITE_TURN_CREDENTIAL: ${VITE_TURN_CREDENTIAL:-}
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env          # GROQ / Azure / Firebase project id / etc.
+    environment:
+      ENVIRONMENT: production
+      DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER:-swasthya}:${POSTGRES_PASSWORD:?}@postgres:5432/${POSTGRES_DB:-swasthya}}
+      REDIS_URL: ${REDIS_URL:-redis://:${REDIS_PASSWORD:?}@redis:6379/0}
+      ALLOWED_ORIGINS: https://${DOMAIN}
+      WEB_CONCURRENCY: ${WEB_CONCURRENCY:-2}
+      STUN_URL: ${STUN_URL:-stun:stun.l.google.com:19302}
+      TURN_URLS: ${TURN_URLS:-}
+      TURN_USERNAME: ${TURN_USERNAME:-}
+      TURN_CREDENTIAL: ${TURN_CREDENTIAL:-}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health').status==200 else 1)"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-swasthya}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-swasthya}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-swasthya}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Live WebRTC voice relay. Enable with:  --profile turn
+  # Requires a public IP and the UDP relay range published below.
+  coturn:
+    image: coturn/coturn:4.6-alpine
+    profiles: ["turn"]
+    restart: unless-stopped
+    network_mode: host          # coturn needs the host's real IP for relays
+    volumes:
+      - ./deploy/turnserver.conf:/etc/coturn/turnserver.conf:ro
+    command: ["-c", "/etc/coturn/turnserver.conf"]
+
+volumes:
+  pg_data:
+  redis_data:
+  caddy_data:
+  caddy_config:

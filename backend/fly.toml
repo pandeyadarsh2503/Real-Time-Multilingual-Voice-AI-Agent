@@ -1,0 +1,38 @@
+# Fly.io deployment for the SwasthyaAI backend.
+# Run from the backend/ directory:
+#   fly launch --no-deploy --copy-config      # reuse this file, create the app
+#   fly secrets set GROQ_API_KEY=... AZURE_TTS_KEY=... AZURE_TTS_REGION=eastus \
+#                   FIREBASE_PROJECT_ID=... DATABASE_URL=<neon> REDIS_URL=<upstash> \
+#                   ALLOWED_ORIGINS=https://<frontend-domain>
+#   fly deploy
+# Alembic migrations run automatically on boot (run_startup_migrations).
+
+app = "swasthyaai-backend"
+primary_region = "sin"          # Singapore — low latency to India; change as needed
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  ENVIRONMENT = "production"
+  PORT = "8000"
+  WEB_CONCURRENCY = "2"          # safe: sessions are backed by REDIS_URL
+  STUN_URL = "stun:stun.l.google.com:19302"
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = "suspend"
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    method = "GET"
+    path = "/health"
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "40s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "1gb"                 # bump to 2gb if Whisper STT is memory-constrained
