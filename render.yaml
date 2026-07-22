@@ -1,0 +1,41 @@
+# Render Blueprint for the SwasthyaAI backend (Docker).
+# Deploy: Render Dashboard → New → Blueprint → point at this repo.
+# Then set the `sync: false` secrets in the service's Environment tab.
+#
+# The backend runs `alembic upgrade head` on boot, so pointing DATABASE_URL
+# at Neon is all that's needed — the schema builds itself on first deploy.
+services:
+  - type: web
+    name: swasthyaai-backend
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    region: singapore            # closest Render region to India
+    # NOTE ON MEMORY: the Whisper STT model needs RAM. Render Free/Starter
+    # (512 MB) may OOM when it loads — if STT/voice crashes on boot, move to
+    # a >=2 GB plan (standard). Text chat + appointments run fine on 512 MB.
+    plan: starter
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: WEB_CONCURRENCY
+        value: "1"              # bump to 2 only after REDIS_URL is set (Upstash)
+      - key: STUN_URL
+        value: stun:stun.l.google.com:19302
+      # ── Secrets — set these in the Render dashboard (sync:false keeps them out of git) ──
+      - key: DATABASE_URL       # your Neon pooled URL (…-pooler…/neondb?sslmode=require)
+        sync: false
+      - key: REDIS_URL          # your Upstash rediss:// URL (needed for multi-worker/session persistence)
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: AZURE_TTS_KEY
+        sync: false
+      - key: AZURE_TTS_REGION
+        value: eastus
+      - key: FIREBASE_PROJECT_ID
+        sync: false
+      - key: ALLOWED_ORIGINS    # https://<your-frontend-domain>
+        sync: false
