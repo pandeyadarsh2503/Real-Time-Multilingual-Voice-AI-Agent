@@ -8,12 +8,18 @@ services:
       dockerfile: Dockerfile
     container_name: swasthyaai-backend
     restart: unless-stopped
+    # DATABASE_URL comes from backend/.env (NOT pinned here — a hardcoded
+    # `environment:` value overrides env_file, which previously forced SQLite
+    # and made the production Postgres/Alembic path unreachable). For the
+    # zero-config dev default set DATABASE_URL=sqlite:////data/swasthya.db in
+    # backend/.env; for production point it at PostgreSQL (Neon) so Alembic runs.
     env_file:
       - ./backend/.env
-    environment:
-      - DATABASE_URL=sqlite:////data/swasthya.db
     ports:
       - "8000:8000"
+    # NOTE: live WebRTC voice also needs aiortc's UDP media ports reachable
+    # (not published here) plus STUN/TURN — see backend/.env.example. The
+    # published :8000 is signaling only; media will not connect without them.
     volumes:
       - db_data:/data
     healthcheck:
